@@ -108,6 +108,7 @@ const handleRegister = async () => {
 </template>
 
 <style scoped>
+
 .register-container {
     display: flex;
     justify-content: center;
@@ -115,11 +116,34 @@ const handleRegister = async () => {
     min-height: 100vh;
     background-color: #f5f7fa;
     padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.register-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('@/assets/register_bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.7;
+    z-index: 0;
 }
 
 .register-card {
     width: 100%;
     max-width: 400px;
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: none;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    position: relative;
+    z-index: 1;
 }
 
 h2 {

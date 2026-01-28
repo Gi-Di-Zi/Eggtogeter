@@ -17,6 +17,7 @@ docs
 !docs/Resources/DB_Schema.md
 !docs/Project_System_Overview.md
 .env
+.agent
 
 # Editor directories and files
 .vscode/*
