@@ -4,16 +4,18 @@ import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from 'vue-i18n'
 
 const password = ref('')
 const confirmPassword = ref('')
 const loading = ref(false)
 const router = useRouter()
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 const handleUpdate = async () => {
     if (password.value !== confirmPassword.value) {
-        ElMessage.error('비밀번호가 일치하지 않습니다.')
+        ElMessage.error(t('auth.update.msg_mismatch'))
         return
     }
 
@@ -26,7 +28,7 @@ const handleUpdate = async () => {
         
         if (sessionError || !session) {
              // If no session, looking at the screen makes no sense
-             ElMessage.error('세션이 만료되었습니다. 링크를 다시 클릭해주세요.')
+             ElMessage.error(t('auth.update.msg_session_expired'))
              router.push('/login')
              return
         }
@@ -54,7 +56,7 @@ const handleUpdate = async () => {
         }
 
         // 3. Success
-        ElMessage.success('비밀번호가 변경되었습니다.')
+        ElMessage.success(t('auth.update.msg_success'))
         
         // Wait briefly for user to see message
         await new Promise(resolve => setTimeout(resolve, 1000))
@@ -83,7 +85,7 @@ const handleUpdate = async () => {
 
     } catch (error: any) {
         console.error('Update error:', error)
-        ElMessage.error('오류 발생: ' + error.message)
+        ElMessage.error(t('auth.update.msg_error') + error.message)
     } finally {
         loading.value = false
     }
@@ -95,19 +97,19 @@ const handleUpdate = async () => {
         <el-card class="auth-card">
             <template #header>
                 <div class="card-header">
-                    <h2>새 비밀번호 설정</h2>
+                    <h2>{{ $t('auth.update.title') }}</h2>
                 </div>
             </template>
             <el-form @submit.prevent="handleUpdate" label-position="top">
-                <el-form-item label="새 비밀번호">
-                    <el-input v-model="password" type="password" placeholder="새 비밀번호를 입력하세요" required show-password />
+                <el-form-item :label="$t('auth.update.label_new_pw')">
+                    <el-input v-model="password" type="password" :placeholder="$t('auth.update.ph_new_pw')" required show-password />
                 </el-form-item>
-                <el-form-item label="비밀번호 확인">
-                    <el-input v-model="confirmPassword" type="password" placeholder="비밀번호를 다시 입력하세요" required
+                <el-form-item :label="$t('auth.update.label_confirm')">
+                    <el-input v-model="confirmPassword" type="password" :placeholder="$t('auth.update.ph_confirm')" required
                         show-password />
                 </el-form-item>
                 <el-button type="primary" native-type="submit" :loading="loading" class="full-width">
-                    비밀번호 변경
+                    {{ $t('auth.update.btn_submit') }}
                 </el-button>
             </el-form>
         </el-card>

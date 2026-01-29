@@ -5,11 +5,13 @@ import { Calendar, Location, Picture, Search, List, Grid, Files, ChatLineRound }
 import { useUiStore } from '@/stores/ui'
 import { useCategoryStore } from '@/stores/category'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from 'vue-i18n'
 
 const photoStore = usePhotoStore()
 const uiStore = useUiStore()
 const categoryStore = useCategoryStore()
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 onMounted(() => {
     categoryStore.fetchCategories()
@@ -37,7 +39,7 @@ const friendFilterOptions = computed(() => {
 
             friendMap.set(photo.user_id, {
                 id: `user:${photo.user_id}`,
-                name: '친구의 사진', // Will be enhanced with nickname below
+                name: t('home.friend_photos'), // Will be enhanced with nickname below
                 color
             })
         }
@@ -107,13 +109,13 @@ const isAllVisible = computed({
                     v-model="dateRange"
                     type="daterange"
                     range-separator="~"
-                    start-placeholder="시작"
-                    end-placeholder="종료"
+                    :start-placeholder="$t('home.start_date')"
+                    :end-placeholder="$t('home.end_date')"
                     format="YYYY-MM-DD"
                     style="flex: 1;"
                     :shortcuts="[
-                        { text: '오늘', value: [new Date(), new Date()] },
-                        { text: '최근 7일', value: () => { const end = new Date(); const start = new Date(); start.setTime(start.getTime() - 3600 * 1000 * 24 * 7); return [start, end] } }
+                        { text: $t('home.today'), value: [new Date(), new Date()] },
+                        { text: $t('home.last_7_days'), value: () => { const end = new Date(); const start = new Date(); start.setTime(start.getTime() - 3600 * 1000 * 24 * 7); return [start, end] } }
                     ]"
                 />
                 <el-button-group>
@@ -139,7 +141,7 @@ const isAllVisible = computed({
             <div class="control-row">
                 <el-input
                     v-model="photoStore.searchQuery"
-                    placeholder="주소, 설명 검색"
+                    :placeholder="$t('home.search_placeholder')"
                     :prefix-icon="Search"
                     clearable
                     @input="photoStore.setSearchQuery"
@@ -151,13 +153,13 @@ const isAllVisible = computed({
             <div class="control-row">
                  <el-select
                     v-model="photoStore.filterCategoryId"
-                    placeholder="카테고리 선택"
+                    :placeholder="$t('home.select_category')"
                     style="flex: 1"
                     clearable
                     @change="photoStore.setFilterCategoryId"
                 >
                     <!-- Friend Options (User-based Filter) -->
-                    <el-option-group label="친구의 사진" v-if="friendFilterOptions.length > 0">
+                    <el-option-group :label="$t('home.friend_photos')" v-if="friendFilterOptions.length > 0">
                         <el-option
                             v-for="friend in friendFilterOptions"
                             :key="friend.id"
@@ -181,7 +183,7 @@ const isAllVisible = computed({
                         </el-option>
                     </el-option-group>
                 </el-select>
-                <el-checkbox v-model="isAllVisible" border>전체 보기</el-checkbox>
+                <el-checkbox v-model="isAllVisible" border>{{ $t('home.view_all') }}</el-checkbox>
             </div>
         </div>
 
@@ -214,7 +216,7 @@ const isAllVisible = computed({
                             </div>
                             <div v-else class="grid-thumbnail text-placeholder">
                                 <el-icon class="placeholder-icon"><ChatLineRound /></el-icon>
-                                <span>텍스트 기록</span>
+                                <span>{{ $t('home.text_record') }}</span>
                                 <div class="grid-date-overlay">
                                     {{ new Date(photo.taken_at || photo.created_at).toLocaleDateString() }}
                                 </div>
@@ -231,7 +233,7 @@ const isAllVisible = computed({
                                 <!-- Always show a bold title row -->
                                 <div class="info-row title">
                                     <span class="text-truncate" style="font-weight: bold; color: #333;">
-                                        {{ photo.title || '제목 없음' }}
+                                        {{ photo.title || $t('home.no_title') }}
                                     </span>
                                 </div>
                                 <div class="info-row date">
@@ -252,7 +254,7 @@ const isAllVisible = computed({
                         <template v-else>
                             <div class="compact-row">
                                 <div class="compact-info">
-                                     <span class="title-compact text-truncate">{{ photo.title || '제목 없음' }}</span>
+                                     <span class="title-compact text-truncate">{{ photo.title || $t('home.no_title') }}</span>
                                      <span class="date">{{ new Date(photo.taken_at || photo.created_at).toLocaleDateString() }}</span>
                                 </div>
                             </div>
@@ -266,7 +268,7 @@ const isAllVisible = computed({
             </div>
         </div>
         
-        <el-empty v-else description="검색 결과가 없습니다." image-size="100">
+        <el-empty v-else :description="$t('home.no_results')" image-size="100">
              <template #image>
                 <el-icon :size="60" color="#909399"><Picture /></el-icon>
             </template>

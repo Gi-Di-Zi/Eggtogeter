@@ -142,7 +142,7 @@ const getCardStyle = (photo: Photo) => {
 <template>
     <div class="photo-edit-view">
         <div class="header-section">
-            <h3>사진 관리</h3>
+            <h3>{{ $t('edit.title') }}</h3>
         </div>
 
         <div class="controls-section">
@@ -151,13 +151,13 @@ const getCardStyle = (photo: Photo) => {
                     v-model="dateRange"
                     type="daterange"
                     range-separator="~"
-                    start-placeholder="시작"
-                    end-placeholder="종료"
+                    :start-placeholder="$t('common.start_date')"
+                    :end-placeholder="$t('common.end_date')"
                     format="YYYY-MM-DD"
                     style="flex: 1;"
                     :shortcuts="[
-                        { text: '오늘', value: [new Date(), new Date()] },
-                        { text: '최근 7일', value: () => { const end = new Date(); const start = new Date(); start.setTime(start.getTime() - 3600 * 1000 * 24 * 7); return [start, end] } }
+                        { text: $t('common.today'), value: [new Date(), new Date()] },
+                        { text: $t('common.last_7_days'), value: () => { const end = new Date(); const start = new Date(); start.setTime(start.getTime() - 3600 * 1000 * 24 * 7); return [start, end] } }
                     ]"
                 />
                 <el-button-group>
@@ -183,7 +183,7 @@ const getCardStyle = (photo: Photo) => {
             <div class="control-row">
                 <el-select
                     v-model="photoStore.filterCategoryId"
-                    placeholder="카테고리 선택"
+                    :placeholder="$t('common.select_category')"
                     style="width: 160px; flex-shrink: 0;"
                     clearable
                     @change="photoStore.setFilterCategoryId"
@@ -200,7 +200,7 @@ const getCardStyle = (photo: Photo) => {
                 </el-select>
                 <el-input
                     v-model="photoStore.searchQuery"
-                    placeholder="주소, 설명 검색"
+                    :placeholder="$t('common.search_placeholder')"
                     :prefix-icon="Search"
                     clearable
                     @input="photoStore.setSearchQuery"
@@ -234,20 +234,20 @@ const getCardStyle = (photo: Photo) => {
                                     {{ new Date(photo.taken_at || photo.created_at).toLocaleDateString() }}
                                 </div>
                                 <div class="grid-edit-icon" @click.stop>
-                                    <div class="icon-circle" @click.stop="openCategoryManager(photo)" title="카테고리">
+                                    <div class="icon-circle" @click.stop="openCategoryManager(photo)" :title="$t('common.category')">
                                         <el-icon><PriceTag /></el-icon>
                                     </div>
-                                    <div class="icon-circle" @click.stop="openShareModal(photo)" title="공유">
+                                    <div class="icon-circle" @click.stop="openShareModal(photo)" :title="$t('common.share')">
                                         <el-icon><Share /></el-icon>
                                     </div>
-                                    <div class="icon-circle" @click.stop="openEditModal(photo)" title="편집">
+                                    <div class="icon-circle" @click.stop="openEditModal(photo)" :title="$t('common.edit')">
                                         <el-icon><Edit /></el-icon>
                                     </div>
                                 </div>
                             </div>
                             <div v-else class="grid-thumbnail text-placeholder">
                                 <el-icon class="placeholder-icon"><ChatLineRound /></el-icon>
-                                <span>텍스트 기록</span>
+                                <span>{{ $t('detail.text_only') }}</span>
                                 <div class="grid-date-overlay">
                                     {{ new Date(photo.taken_at || photo.created_at).toLocaleDateString() }}
                                 </div>
@@ -274,7 +274,7 @@ const getCardStyle = (photo: Photo) => {
                             <div class="list-info">
                                 <div class="info-row title">
                                     <span class="text-truncate" style="font-weight: bold; color: #333;">
-                                        {{ photo.title || '제목 없음' }}
+                                        {{ photo.title || $t('common.no_title') }}
                                     </span>
                                 </div>
                                 <div class="info-row date">
@@ -296,7 +296,7 @@ const getCardStyle = (photo: Photo) => {
                         <template v-else>
                             <div class="compact-row">
                                 <div class="compact-info">
-                                     <span class="title-compact text-truncate">{{ photo.title || '제목 없음' }}</span>
+                                     <span class="title-compact text-truncate">{{ photo.title || $t('common.no_title') }}</span>
                                      <span class="date">{{ new Date(photo.taken_at || photo.created_at).toLocaleDateString() }}</span>
                                 </div>
                             </div>
@@ -311,7 +311,7 @@ const getCardStyle = (photo: Photo) => {
             </div>
         </div>
         
-        <el-empty v-else description="사진이 없습니다." image-size="100">
+        <el-empty v-else :description="$t('common.no_photos')" image-size="100">
              <template #image>
                 <el-icon :size="60" color="#909399"><Picture /></el-icon>
             </template>

@@ -30,32 +30,32 @@ watch(() => authStore.user, (newVal) => {
     <div class="nav-items">
       <RouterLink to="/" class="nav-item" :class="{ active: isActive('/') }">
         <el-icon><House /></el-icon>
-        <span class="label">홈</span>
+        <span class="label">{{ $t('navbar.home') }}</span>
       </RouterLink>
       
       <!-- Edit (Photo Edit) -->
       <RouterLink to="/edit" class="nav-item" active-class="active">
         <el-icon :size="24"><Edit /></el-icon>
-        <span>사진 관리</span>
+        <span>{{ $t('navbar.manage_photos') }}</span>
       </RouterLink>
 
       <div class="nav-item center-btn" :class="{ active: uiStore.isUploadModalOpen }" @click="uiStore.openUploadModal" style="cursor: pointer;">
         <div class="upload-btn-container">
             <el-icon class="upload-icon"><Camera /></el-icon>
-            <span class="label">사진 업로드</span>
+            <span class="label">{{ $t('navbar.upload_photo') }}</span>
         </div>
       </div>
 
       <RouterLink to="/album" class="nav-item" :class="{ active: isActive('/album') }">
         <el-icon><VideoCamera /></el-icon>
-        <span class="label">무빙 앨범</span>
+        <span class="label">{{ $t('navbar.moving_album') }}</span>
       </RouterLink>
 
       <RouterLink to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
         <el-badge :value="friendStore.pendingCount" :hidden="friendStore.pendingCount === 0" class="nav-badge">
             <el-icon><Connection /></el-icon>
         </el-badge>
-        <span class="label">친구</span>
+        <span class="label">{{ $t('navbar.friends') }}</span>
       </RouterLink>
 
       <RouterLink to="/my" class="nav-item my-account-item desktop-only" :class="{ active: isActive('/my') }">
@@ -64,7 +64,7 @@ watch(() => authStore.user, (newVal) => {
           :icon="User" 
           :src="profileStore.profile?.avatar_url || undefined"
         />
-        <span class="label">내 계정</span>
+        <span class="label">{{ $t('navbar.my_account') }}</span>
       </RouterLink>
     </div>
   </nav>

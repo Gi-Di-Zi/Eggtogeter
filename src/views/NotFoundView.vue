@@ -2,14 +2,11 @@
   <div class="not-found-container">
     <div class="content">
       <h1 class="error-code">404</h1>
-      <h2 class="error-message">페이지를 찾을 수 없습니다</h2>
-      <p class="description">
-        요청하신 페이지가 존재하지 않거나, 경로가 변경되었을 수 있습니다.<br>
-        입력하신 주소가 정확한지 다시 한번 확인해 주세요.
-      </p>
+      <h2 class="error-message">{{ $t('common.not_found') }}</h2>
+      <p class="description" v-html="$t('common.not_found_desc')"></p>
       
       <el-button type="primary" size="large" @click="goHome" class="home-button">
-        홈으로 돌아가기
+        {{ $t('common.go_home') }}
       </el-button>
     </div>
   </div>

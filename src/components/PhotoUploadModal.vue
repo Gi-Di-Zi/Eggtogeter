@@ -6,6 +6,9 @@ import { ElMessage } from 'element-plus'
 import exifr from 'exifr'
 import { useKakaoLoader } from '@/composables/useKakaoLoader'
 import { Plus, Calendar, Edit, Location, MapLocation, Search } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     modelValue: boolean
@@ -89,7 +92,7 @@ const handleDrop = async (e: DragEvent) => {
         if (file && file.type.startsWith('image/')) {
             await processFile(file)
         } else {
-            ElMessage.warning('이미지 파일만 업로드 가능합니다.')
+            ElMessage.warning(t('upload.warn_image_only'))
         }
     }
 }
@@ -129,7 +132,7 @@ const processFile = async (file: File) => {
                     longitude.value = data.longitude
                     address.value = addr
                 } else {
-                    ElMessage.warning('위치 정보에 해당하는 주소를 찾을 수 없어 위치 정보를 불러오지 않았습니다.')
+                    ElMessage.warning(t('upload.warn_no_address'))
                 }
             }
             if (data.DateTimeOriginal) {
@@ -212,7 +215,7 @@ const initMap = async () => {
 
     // Init temp location
     const addr = await getAddressFromCoords(initialLat, initialLng)
-    tempLocation.value = { lat: initialLat, lng: initialLng, address: addr || '주소 정보 없음' }
+    tempLocation.value = { lat: initialLat, lng: initialLng, address: addr || t('upload.no_address_info') }
 }
 
 const updateTempLocation = async (lat: number, lng: number) => {
@@ -220,7 +223,7 @@ const updateTempLocation = async (lat: number, lng: number) => {
     mapInstance.value.panTo(new window.kakao.maps.LatLng(lat, lng))
     
     const addr = await getAddressFromCoords(lat, lng)
-    tempLocation.value = { lat, lng, address: addr || '주소 정보 없음' }
+    tempLocation.value = { lat, lng, address: addr || t('upload.no_address_info') }
 }
 
 // Postcode Overlay Logic
@@ -273,7 +276,7 @@ const confirmLocation = () => {
 
 const registerPhoto = async () => {
     if (!latitude.value || !longitude.value || !authStore.user) {
-        ElMessage.warning('위치 정보는 필수입니다.')
+        ElMessage.warning(t('upload.warn_location_required'))
         return
     }
 
@@ -315,7 +318,7 @@ const registerPhoto = async () => {
 
         if (dbError) throw dbError
 
-        ElMessage.success('사진이 등록되었습니다.')
+        ElMessage.success(t('upload.success'))
         
         // Emit success with coordinates for auto-pan
         emit('upload-success', { lat: latitude.value, lng: longitude.value })
@@ -326,7 +329,7 @@ const registerPhoto = async () => {
 
     } catch (e: any) {
         console.error('Upload Error', e)
-        ElMessage.error('업로드 중 오류가 발생했습니다: ' + e.message)
+        ElMessage.error(t('upload.error') + e.message)
     } finally {
         isUploading.value = false
     }
@@ -337,7 +340,7 @@ const registerPhoto = async () => {
   <el-dialog 
     :model-value="modelValue" 
     @update:model-value="emit('update:modelValue', $event)"
-    title="사진 업로드" 
+    :title="$t('upload.title')" 
     width="90%" 
     style="max-width: 500px"
     @close="handleClose"
@@ -354,7 +357,7 @@ const registerPhoto = async () => {
             v-if="!previewUrl"
         >
             <el-icon class="upload-icon"><Plus /></el-icon>
-            <p>클릭 또는 드래그하여 사진 선택</p>
+            <p>{{ $t('upload.drag_text') }}</p>
             <input 
                 type="file" 
                 ref="fileInput" 
@@ -366,7 +369,7 @@ const registerPhoto = async () => {
 
         <div v-else class="preview-area">
             <img :src="previewUrl" class="preview-image" />
-            <el-button @click="triggerFileInput" size="small" class="reselect-btn">다시 선택</el-button>
+            <el-button @click="triggerFileInput" size="small" class="reselect-btn">{{ $t('upload.reselect') }}</el-button>
             <input 
                 type="file" 
                 ref="fileInput" 
@@ -379,55 +382,55 @@ const registerPhoto = async () => {
         <div class="form-area">
             <!-- Title -->
              <div class="form-item">
-                <label><el-icon><Edit /></el-icon> 제목</label>
+                <label><el-icon><Edit /></el-icon> {{ $t('upload.label_title') }}</label>
                 <el-input 
                     v-model="title" 
-                    placeholder="기록의 이름을 입력하세요" 
+                    :placeholder="$t('upload.ph_title')" 
                     clearable 
                 />
             </div>
 
             <!-- Description -->
             <div class="form-item">
-                <label><el-icon><Edit /></el-icon> 내용 / 설명</label>
+                <label><el-icon><Edit /></el-icon> {{ $t('upload.label_desc') }}</label>
                 <el-input 
                     v-model="description" 
                     type="textarea" 
                     :rows="2" 
-                    placeholder="내용을 남겨주세요" 
+                    :placeholder="$t('upload.ph_desc')" 
                 />
             </div>
 
             <div class="form-item">
-                <label><el-icon><Calendar /></el-icon> 일시</label>
+                <label><el-icon><Calendar /></el-icon> {{ $t('upload.label_date') }}</label>
                 <el-date-picker
                     v-model="takenAt"
                     type="datetime"
-                    placeholder="날짜 선택"
+                    :placeholder="$t('upload.ph_date')"
                     format="YYYY-MM-DD HH:mm"
                     style="width: 100%"
                 />
             </div>
 
             <div class="form-item">
-                <label><el-icon><MapLocation /></el-icon> 위치</label>
+                <label><el-icon><MapLocation /></el-icon> {{ $t('upload.label_location') }}</label>
                 <div v-if="latitude && longitude" class="location-info">
-                    <p class="address">{{ address || '주소 정보를 불러오는 중..' }}</p>
+                    <p class="address">{{ address || $t('upload.loading_address') }}</p>
                     <div class="location-btns">
-                        <el-button size="small" type="primary" plain @click="openLocationHelper">위치 수정</el-button>
+                        <el-button size="small" type="primary" plain @click="openLocationHelper">{{ $t('upload.edit_location') }}</el-button>
                     </div>
                 </div>
                 <div v-else class="location-empty">
-                    <p>위치 정보가 없습니다.</p>
+                    <p>{{ $t('upload.no_location') }}</p>
                     <div class="location-btns-center">
-                        <el-button type="primary" plain @click="openLocationHelper"><el-icon><Location /></el-icon> 위치 설정하기</el-button>
+                        <el-button type="primary" plain @click="openLocationHelper"><el-icon><Location /></el-icon> {{ $t('upload.set_location') }}</el-button>
                     </div>
                 </div>
             </div>
 
             <div class="actions">
                 <el-button type="primary" size="large" @click="registerPhoto" :loading="isUploading" class="submit-btn">
-                    기록 등록하기
+                    {{ $t('upload.submit') }}
                 </el-button>
             </div>
         </div>
@@ -436,7 +439,7 @@ const registerPhoto = async () => {
     <!-- Unified Location Helper Modal -->
     <el-dialog
         v-model="showLocationHelper"
-        title="위치 설정"
+        :title="$t('location_helper.title')"
         width="90%"
         style="max-width: 500px"
         append-to-body
@@ -444,10 +447,10 @@ const registerPhoto = async () => {
     >
         <div class="helper-header">
             <el-button type="primary" :icon="Search" @click="togglePostcodeSearch" class="search-toggle-btn">
-                {{ showPostcodeOverlay ? '지도로 돌아가기' : '주소 검색' }}
+                {{ showPostcodeOverlay ? $t('location_helper.back_to_map') : $t('location_helper.search') }}
             </el-button>
             <p v-if="!showPostcodeOverlay && tempLocation" class="current-selected-addr">
-                <el-icon><Location /></el-icon> {{ tempLocation.address || '지도에서 위치를 선택하세요' }}
+                <el-icon><Location /></el-icon> {{ tempLocation.address || $t('location_helper.select_on_map') }}
             </p>
         </div>
 
@@ -462,8 +465,8 @@ const registerPhoto = async () => {
         </div>
 
         <div class="map-picker-footer">
-            <el-button @click="showLocationHelper = false">취소</el-button>
-            <el-button type="primary" @click="confirmLocation" :disabled="!tempLocation">이 위치로 설정</el-button>
+            <el-button @click="showLocationHelper = false">{{ $t('common.cancel') }}</el-button>
+            <el-button type="primary" @click="confirmLocation" :disabled="!tempLocation">{{ $t('location_helper.confirm') }}</el-button>
         </div>
     </el-dialog>
   </el-dialog>

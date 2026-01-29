@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { ElMessage } from 'element-plus'
+import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 
 const email = ref('')
 const password = ref('')
@@ -47,32 +48,35 @@ const handleLogin = async () => {
 
 <template>
   <div class="auth-container">
+    <div class="lang-switch-wrapper">
+        <LanguageSwitcher />
+    </div>
     <el-card class="auth-card">
       <template #header>
         <div class="card-header">
-          <h2>로그인</h2>
+          <h2>{{ $t('login.title') }}</h2>
         </div>
       </template>
       <el-form @submit.prevent="handleLogin" label-position="top">
-        <el-form-item label="이메일">
-          <el-input v-model="email" type="email" placeholder="이메일을 입력하세요" required />
+        <el-form-item :label="$t('common.email')">
+          <el-input v-model="email" type="email" :placeholder="$t('login.email_placeholder')" required />
         </el-form-item>
-        <el-form-item label="비밀번호">
-          <el-input v-model="password" type="password" placeholder="비밀번호를 입력하세요" required show-password />
+        <el-form-item :label="$t('common.password')">
+          <el-input v-model="password" type="password" :placeholder="$t('login.password_placeholder')" required show-password />
         </el-form-item>
         
         <!-- Option Row: Auto Login & Save Email (Moved Up) -->
         <div class="option-row">
-          <el-checkbox v-model="autoLogin">자동 로그인</el-checkbox>
-          <el-checkbox v-model="saveEmail">이메일 저장</el-checkbox>
+          <el-checkbox v-model="autoLogin">{{ $t('login.auto_login') }}</el-checkbox>
+          <el-checkbox v-model="saveEmail">{{ $t('login.save_email') }}</el-checkbox>
         </div>
 
-        <el-button type="primary" native-type="submit" :loading="loading" class="full-width-btn">로그인</el-button>
+        <el-button type="primary" native-type="submit" :loading="loading" class="full-width-btn">{{ $t('common.login') }}</el-button>
 
         <!-- Link Row: Reset Password & Sign Up (Modern Style) -->
         <div class="action-row">
-          <el-button class="sub-action-btn" @click="$router.push('/forgot-password')">비밀번호 재설정</el-button>
-          <el-button class="sub-action-btn" type="success" plain @click="$router.push('/register')">회원가입</el-button>
+          <el-button class="sub-action-btn" @click="$router.push('/forgot-password')">{{ $t('login.forgot_password') }}</el-button>
+          <el-button class="sub-action-btn" type="success" plain @click="$router.push('/register')">{{ $t('common.register') }}</el-button>
         </div>
       </el-form>
     </el-card>
@@ -88,6 +92,13 @@ const handleLogin = async () => {
   background-color: #f0f2f5;
   position: relative;
   overflow: hidden;
+}
+
+.lang-switch-wrapper {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
 }
 
 .auth-container::before {

@@ -86,7 +86,9 @@ const getStyleLabel = (styleType: string) => {
 
 <template>
   <div class="album-page">
-    <h2>무빙 앨범</h2>
+    <div class="page-header">
+      <h2>{{ $t('album.title') }}</h2>
+    </div>
 
     <!-- Create Album Button -->
     <el-button
@@ -96,7 +98,7 @@ const getStyleLabel = (styleType: string) => {
       class="create-btn"
       size="large"
     >
-      무빙 앨범 만들기
+      {{ $t('album.create_button') }}
     </el-button>
 
     <el-divider />
@@ -123,7 +125,7 @@ const getStyleLabel = (styleType: string) => {
         </div>
 
         <div class="album-actions">
-<el-button type="primary" :icon="VideoPlay" @click="handleViewAlbum(album.id, album.style_type)">
+          <el-button type="primary" :icon="VideoPlay" @click="handleViewAlbum(album.id, album.style_type)">
             보기
           </el-button>
           <el-button
@@ -147,7 +149,7 @@ const getStyleLabel = (styleType: string) => {
     </div>
 
     <!-- Empty State -->
-    <el-empty v-else description="생성된 앨범이 없습니다." :image-size="120" />
+    <el-empty v-else :description="$t('album.no_albums')" :image-size="120" />
 
     <!-- Create Album Modal -->
     <CreateAlbumModal v-model="showCreateModal" @created="handleAlbumCreated" />
@@ -182,9 +184,15 @@ const getStyleLabel = (styleType: string) => {
   margin: 0 auto;
 }
 
-h2 {
-  margin-top: 0;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
+}
+
+h2 {
+  margin: 0;
   font-size: 1.5rem;
 }
 

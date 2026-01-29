@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { type Photo } from '@/stores/photo'
 import { Calendar, Location, ChatLineRound, Close } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: boolean
@@ -30,7 +33,7 @@ const handleClose = () => {
             <!-- Header with Close Button -->
             <div class="detail-header">
                 <span class="detail-type-tag" :style="{ backgroundColor: photo.category_color || '#409eff' }">
-                    {{ photo.category_name || '기록' }}
+                    {{ photo.category_name || t('detail.record') }}
                 </span>
                 <el-button 
                     circle 
@@ -48,19 +51,19 @@ const handleClose = () => {
                 <template v-else>
                     <div class="text-record-hero" :style="{ borderLeft: `6px solid ${photo.category_color || '#409eff'}` }">
                         <el-icon :size="48" color="#909399"><ChatLineRound /></el-icon>
-                        <h4>텍스트 전용 기록</h4>
+                        <h4>{{ t('detail.text_only') }}</h4>
                     </div>
                 </template>
             </div>
 
             <!-- Content Section -->
             <div class="content-section">
-                <h2 class="detail-title">{{ photo.title || '제목 없음' }}</h2>
+                <h2 class="detail-title">{{ photo.title || t('common.no_title') }}</h2>
                 
                 <div class="meta-row">
                     <div class="meta-item">
                         <el-icon><Calendar /></el-icon>
-                        <span>{{ new Date(photo.taken_at || photo.created_at).toLocaleString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
+                        <span>{{ new Date(photo.taken_at || photo.created_at).toLocaleString(undefined, { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
                     </div>
                 </div>
 
@@ -77,13 +80,13 @@ const handleClose = () => {
                     <p>{{ photo.description }}</p>
                 </div>
                 <div v-else class="no-description">
-                    <p>내용이 없습니다.</p>
+                    <p>{{ t('detail.no_content') }}</p>
                 </div>
             </div>
 
             <!-- Footer / Action Area (Optional) -->
             <div class="detail-footer">
-                <p class="footer-hint">📍 클릭하여 지도로 이동할 수 있습니다.</p>
+                <p class="footer-hint">{{ t('detail.map_hint') }}</p>
             </div>
         </div>
     </el-dialog>

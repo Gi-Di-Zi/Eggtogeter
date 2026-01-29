@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAlbumStore } from '@/stores/album'
 import { usePhotoStore } from '@/stores/photo'
 import { ElMessage } from 'element-plus'
@@ -8,6 +9,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { VideoCamera, Timer, Memo, Picture, Close, Van, Ship, User, Right, Promotion, Location, Bicycle } from '@element-plus/icons-vue'
 import { useKakaoLoader } from '@/composables/useKakaoLoader'
 import { calculateRoute } from '@/utils/routeCalculator'
+
 
 const props = defineProps<{
   modelValue: boolean
@@ -18,6 +20,7 @@ const emit = defineEmits<{
   (e: 'created'): void
 }>()
 
+const { t } = useI18n()
 const albumStore = useAlbumStore()
 const photoStore = usePhotoStore()
 
@@ -37,23 +40,23 @@ const mapTheme = ref('light')
 // Transitions Data (Step 3)
 const transitions = ref<{ from: string, to: string, mode: string }[]>([])
 
-const styleOptions = [
+const styleOptions = computed(() => [
   {
     value: 'route_anim',
-    label: 'Route Animation',
-    description: '지도 위 시간순 카메라 워크'
+    label: t('album.create.step_basic.labels.route_anim'),
+    description: t('album.create.step_basic.styles.route_anim')
   },
   {
     value: 'scroll_view',
-    label: 'Scroll Narrative',
-    description: '블로그 형태 세로 스크롤'
+    label: t('album.create.step_basic.labels.scroll_view'),
+    description: t('album.create.step_basic.styles.scroll_view')
   },
   {
     value: 'ai_video',
-    label: 'AI Video',
-    description: 'AI로 동영상 생성 (준비 중)'
+    label: t('album.create.step_basic.labels.ai_video'),
+    description: t('album.create.step_basic.styles.ai_video')
   }
-]
+])
 
 
 // Step 2: 사진 선택
@@ -144,12 +147,12 @@ const travelDuration = computed(() => {
   const diffTime = Math.abs(end.getTime() - start.getTime())
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   
-  return diffDays === 0 ? '당일 여행' : `${diffDays}일 동안의 여정`
+  return diffDays === 0 ? t('album.create.step_confirm.day_trip') : t('album.create.step_confirm.days_journey', { days: diffDays })
 })
 
 // Address Recovery Logic
-const startAddr = ref('시작 지점')
-const endAddr = ref('종료 지점')
+const startAddr = ref(t('album.create.step_confirm.start_point'))
+const endAddr = ref(t('album.create.step_confirm.end_point'))
 const { loadKakaoMap } = useKakaoLoader()
 
 const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> => {
@@ -192,13 +195,13 @@ watch(sortedPhotos, async (photos) => {
     if (first?.address) {
       startAddr.value = first.address
     } else {
-      startAddr.value = '시작 지점'
+      startAddr.value = t('album.create.step_confirm.start_point')
     }
 
     if (last?.address) {
       endAddr.value = last.address
     } else {
-      endAddr.value = '종료 지점'
+      endAddr.value = t('album.create.step_confirm.end_point')
     }
 
     // Initialize Transitions
@@ -216,8 +219,8 @@ watch(sortedPhotos, async (photos) => {
     }
     transitions.value = newTransitions
   } else {
-    startAddr.value = '시작 지점'
-    endAddr.value = '종료 지점'
+    startAddr.value = t('album.create.step_confirm.start_point')
+    endAddr.value = t('album.create.step_confirm.end_point')
     transitions.value = []
   }
 }, { immediate: true })
@@ -263,8 +266,6 @@ const initPreviewMap = () => {
     }
   })
 }
-
-// ...
 
 const drawRoute = async () => {
   if (!map || sortedPhotos.value.length < 2) return
@@ -381,7 +382,7 @@ const canProceed = computed(() => {
 const handleNext = () => {
   // [New] Block unimplemented styles (Step 0)
   if (currentStep.value === 0 && styleType.value !== 'route_anim') {
-       ElMessage.info('선택하신 스타일은 현재 준비 중입니다. Route Animation을 이용해주세요.')
+       ElMessage.info(t('album.create.messages.style_preparing'))
        return
   }
   
@@ -422,12 +423,12 @@ const handleCreate = async () => {
       extraOptions, // Pass the style settings to the store
       transitions.value as any // Pass transitions data (cast to any for union type compatibility)
     )
-    ElMessage.success('무빙 앨범이 생성되었습니다!')
+    ElMessage.success(t('album.create.messages.success'))
     dialogVisible.value = false
     emit('created')
   } catch (err) {
     console.error('Album creation error:', err)
-    ElMessage.error('앨범 생성에 실패했습니다.')
+    ElMessage.error(t('album.create.messages.error'))
   }
 }
 </script>
@@ -442,38 +443,43 @@ const handleCreate = async () => {
     :close-on-click-modal="false"
     append-to-body
   >
+    <template #header="{ titleId, titleClass }">
+      <div class="modal-header">
+        <span :id="titleId" :class="titleClass">{{ $t('album.create_modal_title') }}</span>
+      </div>
+    </template>
     <el-steps :active="currentStep" finish-status="success" align-center>
-      <el-step title="기본 정보" />
-      <el-step title="사진 선택" />
-      <el-step title="정보 확인" />
-      <el-step title="스타일 세부 설정" />
+      <el-step :title="$t('album.create.steps.basic_info')" />
+      <el-step :title="$t('album.create.steps.select_photos')" />
+      <el-step :title="$t('album.create.steps.confirm_info')" />
+      <el-step :title="$t('album.create.steps.style_settings')" />
     </el-steps>
 
     <div class="step-content">
       <!-- Step 1: 기본 정보 -->
       <div v-if="currentStep === 0" class="step-panel">
         <el-form label-position="top">
-          <el-form-item label="앨범 제목" required>
+          <el-form-item :label="$t('album.create.step_basic.title_label')" required>
             <el-input
               v-model="title"
-              placeholder="예: 2025 제주도 여행"
+              :placeholder="$t('album.create.step_basic.title_placeholder')"
               maxlength="50"
               show-word-limit
             />
           </el-form-item>
 
-          <el-form-item label="앨범 설명">
+          <el-form-item :label="$t('album.create.step_basic.desc_label')">
             <el-input
               v-model="description"
               type="textarea"
               :rows="3"
-              placeholder="앨범에 대한 간단한 설명 (선택사항)"
+              :placeholder="$t('album.create.step_basic.desc_placeholder')"
               maxlength="200"
               show-word-limit
             />
           </el-form-item>
 
-          <el-form-item label="스타일 선택" required>
+          <el-form-item :label="$t('album.create.step_basic.style_label')" required>
             <div class="style-grid">
               <el-popover
                 v-for="style in styleOptions"
@@ -503,17 +509,17 @@ const handleCreate = async () => {
                 </template>
                 <div class="preview-content">
                   <p v-if="style.value === 'route_anim'">
-                    지도 위에서 이동 경로를 따라 카메라가 움직이며 사진을 한 장씩 보여주는 역동적인 스타일입니다. 하이라이트 여행 영상과 같은 느낌을 줍니다.
+                    {{ $t('album.create.step_basic.style_descriptions.route_anim') }}
                   </p>
                   <p v-else-if="style.value === 'scroll_view'">
-                    한 편의 블로그 포스팅처럼 거대한 타임라인을 세로로 스크롤하며 추억을 되짚는 서사적인 스타일입니다. 사진의 앞뒤 맥락을 느끼기에 좋습니다.
+                    {{ $t('album.create.step_basic.style_descriptions.scroll_view') }}
                   </p>
                   <p v-else>
-                    선택한 사진들을 바탕으로 AI가 자동으로 배경음악과 효과를 넣은 멋진 비디오를 생성합니다. (현재 기능 준비 중)
+                    {{ $t('album.create.step_basic.style_descriptions.ai_video') }}
                   </p>
                   <div class="preview-placeholder">
                     <el-icon :size="40"><Picture /></el-icon>
-                    <span>미리보기 이미지 준비 중</span>
+                    <span>{{ $t('album.create.step_basic.preview_image_preparing') }}</span>
                   </div>
                 </div>
               </el-popover>
@@ -526,14 +532,14 @@ const handleCreate = async () => {
       <div v-if="currentStep === 1" class="step-panel">
         <!-- Filters -->
         <div class="photo-filters">
-          <el-select v-model="filterOwner" placeholder="소유자" size="small" style="width: 120px;">
-            <el-option label="전체" value="all" />
-            <el-option label="내 사진" value="mine" />
-            <el-option label="친구 사진" value="friends" />
+          <el-select v-model="filterOwner" :placeholder="$t('album.create.step_photos.owner_filter')" size="small" style="width: 120px;">
+            <el-option :label="$t('album.create.step_photos.owner_all')" value="all" />
+            <el-option :label="$t('album.create.step_photos.owner_mine')" value="mine" />
+            <el-option :label="$t('album.create.step_photos.owner_friends')" value="friends" />
           </el-select>
 
-          <el-select v-model="filterCategory" placeholder="카테고리" size="small" style="width: 140px;">
-            <el-option label="전체 카테고리" value="all" />
+          <el-select v-model="filterCategory" :placeholder="$t('album.create.step_photos.category_placeholder')" size="small" style="width: 140px;">
+            <el-option :label="$t('album.create.step_photos.category_all')" value="all" />
             <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
           </el-select>
 
@@ -542,8 +548,8 @@ const handleCreate = async () => {
             type="daterange"
             size="small"
             range-separator="~"
-            start-placeholder="시작일"
-            end-placeholder="종료일"
+            :start-placeholder="$t('album.create.step_photos.date_start')"
+            :end-placeholder="$t('album.create.step_photos.date_end')"
             style="width: 240px;"
           />
         </div>
@@ -564,7 +570,7 @@ const handleCreate = async () => {
                 </el-icon>
               </div>
               <div class="photo-overlay-info">
-                <span>{{ photo.address?.split(' ').slice(0, 2).join(' ') || '장소 정보 없음' }}</span>
+                <span>{{ photo.address?.split(' ').slice(0, 2).join(' ') || $t('album.create.step_photos.no_location') }}</span>
               </div>
             </div>
           </div>
@@ -573,8 +579,8 @@ const handleCreate = async () => {
         <!-- Selection Tray (신규) -->
         <div v-if="selectedPhotos.length > 0" class="selected-photos-tray">
           <div class="tray-header">
-            <span>선택된 사진 ({{ selectedPhotos.length }})</span>
-            <el-button link type="primary" size="small" @click="selectedPhotoIds = []">전체 해제</el-button>
+            <span>{{ $t('album.create.step_photos.selected_count', { count: selectedPhotos.length }) }}</span>
+            <el-button link type="primary" size="small" @click="selectedPhotoIds = []">{{ $t('album.create.step_photos.deselect_all') }}</el-button>
           </div>
           <div class="tray-scroll">
             <div 
@@ -591,7 +597,7 @@ const handleCreate = async () => {
             </div>
           </div>
         </div>
-        <p v-else class="selection-count">사진을 선택해주세요.</p>
+        <p v-else class="selection-count">{{ $t('album.create.step_photos.please_select') }}</p>
       </div>
 
       <!-- Step 3: 정보 확인 (기존 Step 3) -->
@@ -599,10 +605,10 @@ const handleCreate = async () => {
         <div class="route-summary-bar">
           <div class="route-info">
             <div class="route-destinations">
-              <span class="dest-label">출발</span>
+              <span class="dest-label">{{ $t('album.create.step_confirm.departure') }}</span>
               <span class="dest-name">{{ startAddr }}</span>
               <el-icon class="arrow-icon"><el-icon-right /></el-icon>
-              <span class="dest-label">도착</span>
+              <span class="dest-label">{{ $t('album.create.step_confirm.arrival') }}</span>
               <span class="dest-name">{{ endAddr }}</span>
             </div>
             <div class="route-duration" v-if="travelDuration">
@@ -614,16 +620,16 @@ const handleCreate = async () => {
 
         <div class="map-preview-container large">
           <div ref="mapContainer" class="album-preview-map"></div>
-          <div class="map-overlay-title">여정 경로 요약</div>
+          <div class="map-overlay-title">{{ $t('album.create.step_confirm.route_summary') }}</div>
         </div>
 
         <div class="summary-details">
           <div class="detail-item">
-            <strong>제목</strong>
+            <strong>{{ $t('album.create.step_confirm.title') }}</strong>
             <span>{{ title }}</span>
           </div>
           <div class="detail-item">
-            <strong>스타일</strong>
+            <strong>{{ $t('album.create.step_confirm.style') }}</strong>
             <span>{{ styleOptions.find(o => o.value === styleType)?.label }}</span>
           </div>
         </div>
@@ -631,7 +637,7 @@ const handleCreate = async () => {
         <el-divider />
 
         <div class="photo-timeline">
-          <h4>타임라인</h4>
+          <h4>{{ $t('album.create.step_confirm.timeline') }}</h4>
           <div class="timeline-container custom-timeline">
             <div 
               v-for="item in timelineItems" 
@@ -645,10 +651,10 @@ const handleCreate = async () => {
                   <img :src="item.photo.publicUrl || item.photo.storage_path" class="timeline-thumbnail" />
                   <div class="timeline-text">
                     <div class="timeline-date">{{ new Date(item.photo.taken_at || item.photo.created_at).toLocaleString() }}</div>
-                    <h5 class="timeline-photo-title">{{ item.photo.title || '제목 없음' }}</h5>
+                    <h5 class="timeline-photo-title">{{ item.photo.title || $t('album.create.step_confirm.no_title') }}</h5>
                     <div class="timeline-addr">
                       <el-icon><Location /></el-icon>
-                      {{ item.photo.address?.trim() || '주소 정보 없음' }}
+                      {{ item.photo.address?.trim() || $t('album.create.step_confirm.no_address') }}
                     </div>
                   </div>
                 </div>
@@ -669,21 +675,21 @@ const handleCreate = async () => {
         <div class="style-setup-panel">
           <h3>
             <el-icon style="margin-right: 8px;"><el-icon-setting /></el-icon>
-            {{ styleOptions.find(o => o.value === styleType)?.label }} 세부 설정
+            {{ $t('album.create.step_style.detail_settings', { style: styleOptions.find(o => o.value === styleType)?.label }) }}
           </h3>
           <el-form>
-            <el-form-item label="지도 테마">
+            <el-form-item :label="$t('album.create.step_style.map_theme')">
               <el-radio-group v-model="mapTheme">
-                <el-radio-button label="light">밝게</el-radio-button>
-                <el-radio-button label="dark">어둡게</el-radio-button>
-                <el-radio-button label="outdoor">아웃도어</el-radio-button>
+                <el-radio-button label="light">{{ $t('album.create.step_style.theme_light') }}</el-radio-button>
+                <el-radio-button label="dark">{{ $t('album.create.step_style.theme_dark') }}</el-radio-button>
+                <el-radio-button label="outdoor">{{ $t('album.create.step_style.theme_outdoor') }}</el-radio-button>
               </el-radio-group>
             </el-form-item>
           </el-form>
 
           <!-- Route Animation 설정 (신규) -->
           <div v-if="styleType === 'route_anim'" class="route-anim-settings">
-            <el-divider content-position="left">구간별 이동 수단 설정</el-divider>
+            <el-divider content-position="left">{{ $t('album.create.step_style.transport_settings') }}</el-divider>
             <div class="transition-list">
               <template v-for="item in timelineItems" :key="item.photo.id + '_trans'">
                  <div v-if="item.transition" class="transition-setting-row">
@@ -713,7 +719,7 @@ const handleCreate = async () => {
                       v-model="item.transition.mode" 
                       size="small" 
                       style="width: 140px;"
-                      placeholder="이동 수단"
+                      :placeholder="$t('album.create.step_style.transport_placeholder')"
                     >
                        <template #prefix>
                          <el-icon v-if="item.transition.mode === 'walk'"><User /></el-icon>
@@ -724,14 +730,14 @@ const handleCreate = async () => {
                          <el-icon v-else-if="item.transition.mode === 'ship'"><Ship /></el-icon>
                          <el-icon v-else-if="item.transition.mode === 'bicycle'"><Bicycle /></el-icon>
                       </template>
-                      <el-option label="도보" value="walk"><span>🚶 도보</span></el-option>
-                      <el-option label="차량" value="car"><span>🚗 차량</span></el-option>
-                      <el-option label="버스" value="bus"><span>🚌 버스</span></el-option>
-                      <el-option label="지하철/기차" value="subway"><span>🚇 지하철/기차</span></el-option>
-                      <el-option label="비행기" value="airplane"><span>✈️ 비행기</span></el-option>
-                      <el-option label="배" value="ship"><span>🚢 배</span></el-option>
-                      <el-option label="자전거" value="bicycle"><span>🚲 자전거</span></el-option>
-                      <el-option label="이동 없음" value="none">이동 없음 (점프)</el-option>
+                      <el-option :label="$t('album.create.step_style.transports.walk')" value="walk"><span>🚶 {{ $t('album.create.step_style.transports.walk') }}</span></el-option>
+                      <el-option :label="$t('album.create.step_style.transports.car')" value="car"><span>🚗 {{ $t('album.create.step_style.transports.car') }}</span></el-option>
+                      <el-option :label="$t('album.create.step_style.transports.bus')" value="bus"><span>🚌 {{ $t('album.create.step_style.transports.bus') }}</span></el-option>
+                      <el-option :label="$t('album.create.step_style.transports.subway')" value="subway"><span>🚇 {{ $t('album.create.step_style.transports.subway') }}</span></el-option>
+                      <el-option :label="$t('album.create.step_style.transports.airplane')" value="airplane"><span>✈️ {{ $t('album.create.step_style.transports.airplane') }}</span></el-option>
+                      <el-option :label="$t('album.create.step_style.transports.ship')" value="ship"><span>🚢 {{ $t('album.create.step_style.transports.ship') }}</span></el-option>
+                      <el-option :label="$t('album.create.step_style.transports.bicycle')" value="bicycle"><span>🚲 {{ $t('album.create.step_style.transports.bicycle') }}</span></el-option>
+                      <el-option :label="$t('album.create.step_style.transports.none')" value="none">{{ $t('album.create.step_style.transports.none') }}</el-option>
                     </el-select>
                  </div>
               </template>
@@ -740,7 +746,7 @@ const handleCreate = async () => {
           
           <div class="style-preview-tip">
             <el-alert
-              title="세부 설정은 앨범 생성 후에도 수정할 수 있습니다."
+              :title="$t('album.create.step_style.settings_tip')"
               type="info"
               show-icon
               :closable="false"
@@ -752,12 +758,12 @@ const handleCreate = async () => {
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button v-if="currentStep > 0" @click="handlePrev">이전</el-button>
+        <el-button v-if="currentStep > 0" @click="handlePrev">{{ $t('album.create.buttons.prev') }}</el-button>
         <el-button v-if="currentStep < 3" type="primary" @click="handleNext" :disabled="!canProceed">
-          다음
+          {{ $t('album.create.buttons.next') }}
         </el-button>
         <el-button v-if="currentStep === 3" type="primary" @click="handleCreate" :loading="albumStore.loading">
-          생성
+          {{ $t('album.create.buttons.create') }}
         </el-button>
       </div>
     </template>
@@ -797,6 +803,13 @@ export default {
 .step-panel {
   animation: fadeIn 0.3s;
   padding: 10px; /* Added from suggested edit */
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-right: 30px; /* Space for close button */
 }
 
 @keyframes fadeIn {

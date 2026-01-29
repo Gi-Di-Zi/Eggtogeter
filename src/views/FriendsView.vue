@@ -4,6 +4,7 @@ import { useFriendStore } from '@/stores/friend'
 import { Plus, User, Check, Close } from '@element-plus/icons-vue'
 import FriendSearchModal from '@/components/FriendSearchModal.vue'
 
+
 const friendStore = useFriendStore()
 const activeTab = ref('friends')
 const showSearchModal = ref(false)
@@ -29,12 +30,12 @@ const handleReject = async (id: string) => {
 <template>
     <div class="friends-view">
         <div class="header-section">
-            <h3>친구</h3>
+            <h3>{{ $t('friends.title') }}</h3>
             <el-button type="primary" size="small" :icon="Plus" circle @click="showSearchModal = true" />
         </div>
 
         <el-tabs v-model="activeTab" class="friend-tabs" @tab-click="refreshData">
-            <el-tab-pane label="내 친구" name="friends">
+            <el-tab-pane :label="$t('friends.tab_my_friends')" name="friends">
                 <div class="list-container" v-if="friendStore.friends.length > 0">
                     <div class="friend-item" v-for="friend in friendStore.friends" :key="friend.id">
                         <div class="friend-info">
@@ -51,10 +52,10 @@ const handleReject = async (id: string) => {
                         <!-- Future: Delete friend button -->
                     </div>
                 </div>
-                <el-empty v-else description="친구가 없습니다." :image-size="80" />
+                <el-empty v-else :description="$t('friends.no_friends')" :image-size="80" />
             </el-tab-pane>
             
-            <el-tab-pane label="받은 요청" name="requests">
+            <el-tab-pane :label="$t('friends.tab_requests')" name="requests">
                  <div class="list-container" v-if="friendStore.receivedRequests.length > 0">
                     <div class="request-item" v-for="req in friendStore.receivedRequests" :key="req.id">
                         <div class="friend-info">
@@ -74,7 +75,7 @@ const handleReject = async (id: string) => {
                         </div>
                     </div>
                 </div>
-                 <el-empty v-else description="받은 요청이 없습니다." :image-size="80" />
+                 <el-empty v-else :description="$t('friends.no_requests')" :image-size="80" />
             </el-tab-pane>
 
         </el-tabs>

@@ -3,14 +3,16 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { supabase } from '@/lib/supabase'
+import { useI18n } from 'vue-i18n'
 
 const email = ref('')
 const router = useRouter()
 const loading = ref(false)
+const { t } = useI18n()
 
 const handleReset = async () => {
     if (!email.value) {
-        ElMessage.warning('이메일을 입력해주세요.')
+        ElMessage.warning(t('auth.reset.msg_enter_email'))
         return
     }
 
@@ -26,13 +28,13 @@ const handleReset = async () => {
         
         if (profileError) {
             console.error('Error checking profile:', profileError)
-            ElMessage.error('프로필 확인 중 오류가 발생했습니다.')
+            ElMessage.error(t('auth.reset.msg_profile_error'))
             loading.value = false
             return
         }
 
         if (!profile) {
-             ElMessage.warning('등록되지 않은 이메일입니다.')
+             ElMessage.warning(t('auth.reset.msg_email_not_found'))
              loading.value = false
              return
         }
@@ -46,11 +48,11 @@ const handleReset = async () => {
         
         if (error) throw error
         
-        ElMessage.success('비밀번호 재설정 링크가 이메일로 발송되었습니다.')
+        ElMessage.success(t('auth.reset.msg_link_sent'))
         router.push('/login')
         
     } catch (error: any) {
-        ElMessage.error('이메일 전송 실패: ' + error.message)
+        ElMessage.error(t('auth.reset.msg_send_fail') + error.message)
     } finally {
         loading.value = false
     }
@@ -62,19 +64,19 @@ const handleReset = async () => {
         <el-card class="auth-card">
             <template #header>
                 <div class="card-header">
-                    <h2>비밀번호 재설정</h2>
+                    <h2>{{ $t('auth.reset.title') }}</h2>
                 </div>
             </template>
             <el-form @submit.prevent="handleReset" label-position="top">
-                <p class="description">가입한 이메일 주소를 입력하시면 비밀번호 재설정 링크를 보내드립니다.</p>
-                <el-form-item label="이메일">
-                    <el-input v-model="email" type="email" placeholder="이메일을 입력하세요" required />
+                <p class="description">{{ $t('auth.reset.description') }}</p>
+                <el-form-item :label="$t('auth.reset.label_email')">
+                    <el-input v-model="email" type="email" :placeholder="$t('auth.reset.ph_email')" required />
                 </el-form-item>
                 <el-button type="primary" native-type="submit" class="full-width">
-                    재설정 링크 보내기
+                    {{ $t('auth.reset.btn_submit') }}
                 </el-button>
                 <div class="auth-links">
-                    <router-link to="/login">로그인으로 돌아가기</router-link>
+                    <router-link to="/login">{{ $t('auth.reset.link_back') }}</router-link>
                 </div>
             </el-form>
         </el-card>

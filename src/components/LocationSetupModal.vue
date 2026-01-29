@@ -1,7 +1,7 @@
 ﻿<template>
   <el-dialog
     v-model="dialogVisible"
-    title="기준 위치 설정"
+    :title="$t('setup.title')"
     :close-on-click-modal="allowSkip"
     :close-on-press-escape="allowSkip"
     :show-close="allowSkip"
@@ -13,20 +13,17 @@
     <div class="setup-container">
       <template v-if="!selectedAddress">
         <template v-if="!isSearching">
-          <p class="description">
-            서비스 이용을 위해 기준 위치(집)를 설정해주세요.<br>
-            지도 시작 위치로 사용됩니다.
-          </p>
+          <p class="description" v-html="$t('setup.intro')"></p>
 
           <div class="action-area">
             <el-button type="primary" size="large" @click="startSearch" :loading="loading">
-              주소 검색하기
+              {{ $t('setup.search_btn') }}
             </el-button>
           </div>
           
           <div v-if="allowSkip" class="skip-area">
             <el-button link @click="skipSetup">
-              다음에 하기
+              {{ $t('setup.skip') }}
             </el-button>
           </div>
         </template>
@@ -35,24 +32,24 @@
         <div v-show="isSearching" class="postcode-wrapper">
           <div ref="postcodeContainer" class="postcode-layer"></div>
           <div class="cancel-search">
-            <el-button @click="cancelSearch">취소</el-button>
+            <el-button @click="cancelSearch">{{ $t('common.cancel') }}</el-button>
           </div>
         </div>
       </template>
 
       <template v-else>
         <div class="confirmation-area">
-          <p class="section-title">선택된 주소:</p>
+          <p class="section-title">{{ $t('setup.selected_address') }}</p>
           <p class="address-text">{{ selectedAddress }}</p>
           
           <div class="map-preview" id="preview-map"></div>
 
-          <p class="question">이 위치로 설정하시겠습니까?</p>
+          <p class="question">{{ $t('setup.confirm_question') }}</p>
           
           <div class="button-group">
-            <el-button @click="resetSelection">다시 검색</el-button>
+            <el-button @click="resetSelection">{{ $t('setup.retry') }}</el-button>
             <el-button type="primary" @click="confirmLocation" :loading="loading">
-              확인
+              {{ $t('common.confirm') }}
             </el-button>
           </div>
         </div>
@@ -67,6 +64,9 @@ import { useKakaoLoader } from '@/composables/useKakaoLoader'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/lib/supabase'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: boolean
@@ -98,7 +98,7 @@ onMounted(async () => {
         await Promise.all([loadKakaoMap(), loadDaumPostcode()])
     } catch (e) {
         console.error('Failed to load Kakao scripts', e)
-        ElMessage.error('지도 모듈을 불러오는데 실패했습니다.')
+        ElMessage.error(t('setup.error_map_load'))
     }
 })
 
@@ -151,7 +151,7 @@ const initPostcode = () => {
 const handleAddressSelection = (fullAddress: string) => {
      try {
         if (!window.kakao || !window.kakao.maps || !window.kakao.maps.services) {
-            throw new Error('지도 서비스가 로드되지 않았습니다.')
+            throw new Error(t('setup.error_map_load'))
         }
 
         const geocoder = new window.kakao.maps.services.Geocoder()
@@ -170,17 +170,17 @@ const handleAddressSelection = (fullAddress: string) => {
                     showPreviewMap()
                 } else {
                     console.warn('Geocoding failed Status:', status)
-                    ElMessage.error('주소 좌표 변환에 실패했습니다. (API 설정 확인 필요)')
+                    ElMessage.error(t('setup.error_geocode'))
                     isSearching.value = false // Go back to start
                 }
             } catch (innerError: any) {
                 console.error('Inner Geocode Error:', innerError)
-                ElMessage.error('좌표 처리 중 오류가 발생했습니다.')
+                ElMessage.error(t('setup.error_geocode'))
             }
         })
     } catch (err: any) {
         console.error('Postcode Error:', err)
-        ElMessage.error('주소 선택 후 처리 중 오류: ' + err.message)
+        ElMessage.error(t('setup.process_error') + err.message)
     }
 }
 
@@ -225,12 +225,12 @@ const confirmLocation = async () => {
         
         if (error) throw error
         
-        ElMessage.success('기준 위치가 설정되었습니다.')
+        ElMessage.success(t('setup.success'))
         await authStore.fetchProfile(authStore.user.id)
         emit('success')
         handleClose()
     } catch (error: any) {
-        ElMessage.error('프로필 저장 중 오류가 발생했습니다: ' + error.message)
+        ElMessage.error(t('setup.save_error') + ': ' + error.message)
     } finally {
         loading.value = false
     }

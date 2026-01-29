@@ -6,10 +6,14 @@ import { Delete, Search, Location, Edit, Calendar, ChatLineRound } from '@elemen
 import { supabase } from '@/lib/supabase'
 import { useKakaoLoader } from '@/composables/useKakaoLoader'
 
+import { useI18n } from 'vue-i18n'
+
 const props = defineProps<{
   modelValue: boolean
   photo: Photo | null
 }>()
+
+const { t } = useI18n({ useScope: 'global' })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
@@ -26,7 +30,7 @@ const showLocationHelper = ref(false)
 const mapContainer = ref<HTMLElement | null>(null)
 const mapInstance = ref<any>(null)
 const mapMarker = ref<any>(null)
-const tempLocation = ref<{ lat: number, lng: number, address: string } | null>(null)
+const tempLocation = ref<{ lat: number, lng: number, address: string | null } | null>(null)
 
 // Postcode Overlay State
 const showPostcodeOverlay = ref(false)
@@ -39,7 +43,7 @@ watch(() => props.photo, async (newPhoto) => {
         
         // If address is missing but we have coordinates, try to recover it
         if (!localPhoto.value.address && localPhoto.value.latitude && localPhoto.value.longitude) {
-            localPhoto.value.address = '주소 불러오는 중...' // Temporary feedback
+            // Do NOT set placeholder to address (avoids saving "Loading..." text)
             
             // Ensure SDK is loaded
             await loadKakaoMap()
@@ -47,9 +51,8 @@ watch(() => props.photo, async (newPhoto) => {
             const recoveredAddr = await getAddressFromCoords(localPhoto.value.latitude, localPhoto.value.longitude)
             if (recoveredAddr) {
                 localPhoto.value.address = recoveredAddr
-            } else {
-                 localPhoto.value.address = '주소 정보 없음'
             }
+            // If still null, template will handle showing "No Location"
         }
     } else {
         localPhoto.value = {}
@@ -80,25 +83,28 @@ const handleSave = async () => {
         
         if (updateError) throw updateError
 
-        ElMessage.success('저장되었습니다.')
+        ElMessage.success(t('photo.edit.msg_saved'))
         emit('refresh')
         handleClose()
     } catch (e) {
         console.error(e)
-        ElMessage.error('저장 중 오류가 발생했습니다.')
+        ElMessage.error(t('photo.edit.msg_save_error'))
     } finally {
         loading.value = false
     }
 }
-
 const handleDelete = async () => {
     if (!props.photo) return
     try {
-        await ElMessageBox.confirm('정말 이 사진을 삭제하시겠습니까?', '경고', {
-            type: 'warning',
-            confirmButtonText: '삭제',
-            cancelButtonText: '취소'
-        })
+        await ElMessageBox.confirm(
+            t('photo.edit.delete_confirm_msg'), 
+            t('photo.edit.delete_confirm_title'), 
+            {
+                type: 'warning',
+                confirmButtonText: t('photo.edit.btn_delete'),
+                cancelButtonText: t('photo.edit.btn_cancel')
+            }
+        )
         
         // Delete from Storage
         if (props.photo.storage_path) {
@@ -109,7 +115,7 @@ const handleDelete = async () => {
         const { error } = await supabase.from('photos').delete().eq('id', props.photo.id)
         if (error) throw error
 
-        ElMessage.success('삭제되었습니다.')
+        ElMessage.success(t('photo.edit.msg_deleted'))
         emit('refresh')
         handleClose()
     } catch (e) {
@@ -178,10 +184,9 @@ const initMap = async () => {
     }
 
     // Init temp location state
-    // Don't overwrite address if we just opened the map, unless we dragged/clicked.
-    // But for consistency with upload modal, we set tempLocation.
     const addr = localPhoto.value.address || await getAddressFromCoords(initialLat, initialLng)
-    tempLocation.value = { lat: initialLat, lng: initialLng, address: addr || '주소 정보 없음' }
+    // Fix: Don't use t() here. Use null if no address, handle fallback in template
+    tempLocation.value = { lat: initialLat, lng: initialLng, address: addr || null }
 }
 
 const updateTempLocation = async (lat: number, lng: number) => {
@@ -189,7 +194,7 @@ const updateTempLocation = async (lat: number, lng: number) => {
     mapInstance.value.panTo(new window.kakao.maps.LatLng(lat, lng))
     
     const addr = await getAddressFromCoords(lat, lng)
-    tempLocation.value = { lat, lng, address: addr || '주소 정보 없음' }
+    tempLocation.value = { lat, lng, address: addr || null }
 }
 
 const togglePostcodeSearch = () => {
@@ -233,17 +238,16 @@ const confirmLocation = () => {
     if (tempLocation.value) {
         localPhoto.value.latitude = tempLocation.value.lat
         localPhoto.value.longitude = tempLocation.value.lng
-        localPhoto.value.address = tempLocation.value.address
+        localPhoto.value.address = tempLocation.value.address || ''
     }
     showLocationHelper.value = false
 }
-
 </script>
 
 <template>
     <el-dialog
         :model-value="modelValue"
-        title="사진 정보 편집"
+        :title="$t('photo.edit.title')"
         width="90%"
         max-width="500px"
         @close="handleClose"
@@ -255,32 +259,32 @@ const confirmLocation = () => {
             <div v-if="localPhoto.publicUrl" class="image-preview" :style="{ backgroundImage: `url(${localPhoto.publicUrl})` }"></div>
             <div v-else class="image-preview text-record-placeholder">
                 <el-icon :size="48"><ChatLineRound /></el-icon>
-                <span>텍스트 전용 기록</span>
+                <span>{{ $t('photo.edit.text_only_placeholder') }}</span>
             </div>
 
             <el-form label-position="top">
                 <!-- 1. Title -->
-                <el-form-item label="제목">
-                    <el-input v-model="localPhoto.title" placeholder="제목을 입력하세요" :prefix-icon="Edit" />
+                <el-form-item :label="$t('photo.edit.label_title')">
+                    <el-input v-model="localPhoto.title" :placeholder="$t('photo.edit.ph_title')" :prefix-icon="Edit" />
                 </el-form-item>
 
                 <!-- 2. Description (Moved up) -->
-                <el-form-item label="설명">
+                <el-form-item :label="$t('photo.edit.label_desc')">
                     <el-input 
                         v-model="localPhoto.description" 
                         type="textarea" 
                         :rows="3" 
-                        placeholder="설명을 입력하세요" 
+                        :placeholder="$t('photo.edit.ph_desc')" 
                         :prefix-icon="Edit"
                     />
                 </el-form-item>
 
                 <!-- 3. Taken Date -->
-                <el-form-item label="촬영 날짜">
+                <el-form-item :label="$t('photo.edit.label_date')">
                     <el-date-picker
                         v-model="localPhoto.taken_at"
                         type="datetime"
-                        placeholder="날짜 선택"
+                        :placeholder="$t('photo.edit.ph_date')"
                         style="width: 100%"
                         format="YYYY-MM-DD HH:mm"
                         :prefix-icon="Calendar"
@@ -288,16 +292,16 @@ const confirmLocation = () => {
                 </el-form-item>
 
                 <!-- 4. Location (Map Integration) -->
-                <el-form-item label="위치">
+                <el-form-item :label="$t('photo.edit.label_location')">
                     <div class="location-display">
                          <div class="location-text-group">
                              <el-icon><Location /></el-icon>
                              <span class="location-text">
-                                 {{ localPhoto.address || '위치 정보 없음' }}
+                                 {{ localPhoto.address || $t('photo.edit.no_location') }}
                              </span>
                          </div>
                          <el-button size="small" type="primary" plain @click="openLocationHelper">
-                            {{ localPhoto.address ? '위치 수정' : '위치 설정' }}
+                            {{ localPhoto.address ? $t('photo.edit.edit_location') : $t('photo.edit.set_location') }}
                          </el-button>
                     </div>
                 </el-form-item>
@@ -307,10 +311,10 @@ const confirmLocation = () => {
 
         <template #footer>
             <div class="dialog-footer">
-                <el-button type="danger" :icon="Delete" @click="handleDelete" plain>삭제</el-button>
+                <el-button type="danger" :icon="Delete" @click="handleDelete" plain>{{ $t('photo.edit.btn_delete') }}</el-button>
                 <div class="right-actions">
-                    <el-button @click="handleClose">취소</el-button>
-                    <el-button type="primary" @click="handleSave" :loading="loading">저장</el-button>
+                    <el-button @click="handleClose">{{ $t('photo.edit.btn_cancel') }}</el-button>
+                    <el-button type="primary" @click="handleSave" :loading="loading">{{ $t('photo.edit.btn_save') }}</el-button>
                 </div>
             </div>
         </template>
@@ -319,7 +323,7 @@ const confirmLocation = () => {
     <!-- Location Helper Modal -->
     <el-dialog
         v-model="showLocationHelper"
-        title="위치 설정"
+        :title="$t('location_helper.title')"
         width="90%"
         style="max-width: 500px"
         append-to-body
@@ -327,10 +331,10 @@ const confirmLocation = () => {
     >
         <div class="helper-header">
             <el-button type="primary" :icon="Search" @click="togglePostcodeSearch" class="search-toggle-btn">
-                {{ showPostcodeOverlay ? '지도로 돌아가기' : '주소 검색' }}
+                {{ showPostcodeOverlay ? $t('location_helper.back_to_map') : $t('location_helper.search') }}
             </el-button>
             <p v-if="!showPostcodeOverlay && tempLocation" class="current-selected-addr">
-                <el-icon><Location /></el-icon> {{ tempLocation.address || '지도에서 위치를 선택하세요' }}
+                <el-icon><Location /></el-icon> {{ tempLocation.address || $t('location_helper.select_on_map') }}
             </p>
         </div>
 
@@ -342,8 +346,8 @@ const confirmLocation = () => {
         </div>
 
         <div class="map-picker-footer">
-            <el-button @click="showLocationHelper = false">취소</el-button>
-            <el-button type="primary" @click="confirmLocation" :disabled="!tempLocation">이 위치로 설정</el-button>
+            <el-button @click="showLocationHelper = false">{{ $t('photo.edit.btn_cancel') }}</el-button>
+            <el-button type="primary" @click="confirmLocation" :disabled="!tempLocation">{{ $t('location_helper.confirm') }}</el-button>
         </div>
     </el-dialog>
 </template>

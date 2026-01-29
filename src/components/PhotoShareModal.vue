@@ -6,6 +6,9 @@ import { useFriendStore } from '@/stores/friend'
 import { supabase } from '@/lib/supabase'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete, User } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
   modelValue: boolean
@@ -87,7 +90,8 @@ watch(shareScope, async (newVal) => {
 const addedFriends = computed(() => {
     return selectedFriendIds.value.map(id => {
         const f = friendStore.friends.find(fr => fr.id === id)
-        return f || { id, email: '알 수 없는 사용자' }
+        // Fix: Don't use t() here. Return object with empty email or flag
+        return f || { id, email: '', isUnknown: true }
     })
 })
 
@@ -110,7 +114,7 @@ const handleRemoveFriend = (id: string) => {
 const handleSave = async () => {
     if (props.photoId) {
         if (shareScope.value === 'specific' && selectedFriendIds.value.length === 0) {
-             ElMessage.warning('공유할 친구를 최소 한 명 추가이어주세요.')
+             ElMessage.warning(t('photo.share.warn_select_one'))
              return
         }
 
@@ -119,7 +123,7 @@ const handleSave = async () => {
             shareScope.value, 
             selectedFriendIds.value
         )
-        ElMessage.success('공유 설정이 저장되었습니다.')
+        ElMessage.success(t('photo.share.msg_saved'))
     }
     dialogVisible.value = false
 }
@@ -128,27 +132,27 @@ const handleSave = async () => {
 <template>
   <el-dialog
     v-model="dialogVisible"
-    title="공유 설정"
+    :title="$t('photo.share.title')"
     width="90%"
     style="max-width: 450px;"
     align-center
     append-to-body
   >
     <div class="share-modal-content">
-        <p class="description">이 사진을 누구에게 보여줄까요?</p>
+        <p class="description">{{ $t('photo.share.description') }}</p>
         
         <el-radio-group v-model="shareScope" class="scope-group">
             <div class="scope-item">
                 <el-radio label="friends" size="large" border>
-                    <span class="label-title">전체 친구</span>
-                    <span class="label-desc">등록된 모든 친구에게 보입니다.</span>
+                    <span class="label-title">{{ $t('photo.share.scope_friends') }}</span>
+                    <span class="label-desc">{{ $t('photo.share.scope_friends_desc') }}</span>
                 </el-radio>
             </div>
             
             <div class="scope-item">
                 <el-radio label="specific" size="large" border>
-                    <span class="label-title">특정 친구 선택</span>
-                    <span class="label-desc">선택한 친구에게만 보입니다.</span>
+                    <span class="label-title">{{ $t('photo.share.scope_specific') }}</span>
+                    <span class="label-desc">{{ $t('photo.share.scope_specific_desc') }}</span>
                 </el-radio>
                 
                 <!-- Specific Friends UI: Input + List -->
@@ -156,10 +160,9 @@ const handleSave = async () => {
                     <div class="add-row">
                         <el-select
                             v-model="targetFriendId"
-                            placeholder="친구 선택"
-                            style="flex: 1;"
+                            :placeholder="$t('photo.share.ph_select_friend')"
                             filterable
-                            :loading="loadingShares"
+                            style="flex: 1;"
                         >
                             <el-option
                                 v-for="friend in availableFriends"
@@ -169,19 +172,19 @@ const handleSave = async () => {
                             />
                         </el-select>
                         <el-button type="primary" :icon="Plus" @click="handleAddFriend" :disabled="!targetFriendId">
-                            추가
+                            {{ $t('photo.share.btn_add') }}
                         </el-button>
                     </div>
 
                     <!-- Added Friends List -->
                     <div class="added-list">
                         <div v-if="addedFriends.length === 0" class="empty-msg">
-                            친구를 추가해주세요.
+                            {{ $t('photo.share.empty_friends') }}
                         </div>
                         <div v-else class="friend-item" v-for="friend in addedFriends" :key="friend.id">
                             <div class="friend-info">
                                 <el-icon><User /></el-icon>
-                                <span class="friend-name">{{ friend.email }}</span>
+                                <span class="friend-name">{{ (friend as any).isUnknown ? $t('photo.share.unknown_user') : friend.email }}</span>
                             </div>
                             <el-button 
                                 circle 
@@ -198,8 +201,8 @@ const handleSave = async () => {
 
             <div class="scope-item">
                 <el-radio label="private" size="large" border>
-                    <span class="label-title">나만 보기 (비공개)</span>
-                    <span class="label-desc">지도에서도 나에게만 보입니다.</span>
+                    <span class="label-title">{{ $t('photo.share.scope_private') }}</span>
+                    <span class="label-desc">{{ $t('photo.share.scope_private_desc') }}</span>
                 </el-radio>
             </div>
         </el-radio-group>
@@ -207,9 +210,9 @@ const handleSave = async () => {
 
     <template #footer>
       <span class="dialog-footer">
-        <el-button @click="dialogVisible = false">취소</el-button>
+        <el-button @click="dialogVisible = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="handleSave" :loading="photoStore.loading">
-          저장
+          {{ $t('common.save') }}
         </el-button>
       </span>
     </template>

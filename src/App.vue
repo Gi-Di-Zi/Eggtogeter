@@ -12,6 +12,10 @@ import { useUiStore } from '@/stores/ui'
 import { useProfileStore } from '@/stores/profile'
 import { onMounted, ref, watch, provide } from 'vue'
 import { usePhotoStore } from '@/stores/photo'
+import { useLocale } from '@/composables/useLocale'
+// ... (existing imports)
+
+const { initLocale } = useLocale()
 
 const router = useRouter()
 const isRouterReady = ref(false)
@@ -56,6 +60,9 @@ watch(() => uiStore.mapRefreshTrigger, async () => {
 onMounted(async () => {
   // Initialize Auth
   await authStore.initialize()
+  
+  // Initialize Locale (IP Detection)
+  initLocale()
   
   // Check if profile setup needed
   if (authStore.user?.id) {

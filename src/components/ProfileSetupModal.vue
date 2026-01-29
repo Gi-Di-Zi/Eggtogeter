@@ -4,6 +4,9 @@ import { useProfileStore } from '@/stores/profile'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import { User, Upload } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     modelValue: boolean
@@ -34,7 +37,7 @@ const handleAvatarChange = (file: File) => {
 
 const handleAutoGenerate = () => {
     if (!nickname.value.trim()) {
-        ElMessage.warning('별명을 먼저 입력해주세요.')
+        ElMessage.warning(t('profile_setup.warn_nickname_first'))
         return
     }
     // Clear file and set preview to auto-generated avatar
@@ -44,12 +47,12 @@ const handleAutoGenerate = () => {
 
 const handleSubmit = async () => {
     if (!nickname.value.trim()) {
-        ElMessage.error('별명을 입력해주세요.')
+        ElMessage.error(t('my.warn_nickname'))
         return
     }
 
     if (!authStore.user?.id) {
-        ElMessage.error('로그인 정보를 찾을 수 없습니다.')
+        ElMessage.error(t('common.login_required'))
         return
     }
 
@@ -60,12 +63,12 @@ const handleSubmit = async () => {
             nickname.value.trim(),
             avatarFile.value
         )
-        ElMessage.success('프로필이 설정되었습니다!')
+        ElMessage.success(t('profile_setup.msg_success'))
         emit('update:modelValue', false)
         emit('complete')
     } catch (err) {
         console.error('Profile setup error:', err)
-        ElMessage.error('프로필 설정에 실패했습니다.')
+        ElMessage.error(t('profile_setup.error_setup'))
     } finally {
         uploading.value = false
     }
@@ -73,7 +76,7 @@ const handleSubmit = async () => {
 
 const handleSkip = async () => {
     if (!nickname.value.trim()) {
-        ElMessage.error('별명을 입력한 후 건너뛰기를 해주세요.')
+        ElMessage.error(t('profile_setup.warn_skip'))
         return
     }
     // Skip avatar upload, auto-generate from nickname
@@ -85,11 +88,12 @@ const handleSkip = async () => {
     <el-dialog
         :model-value="modelValue"
         @update:model-value="emit('update:modelValue', $event)"
-        title="프로필 설정"
+        :title="$t('profile_setup.title')"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         :show-close="false"
-        width="500px"
+        width="90%"
+        style="max-width: 500px;"
     >
         <div class="profile-setup">
             <div class="avatar-section">
@@ -112,15 +116,15 @@ const handleSkip = async () => {
                     size="small"
                     :icon="Upload"
                 >
-                    이미지 자동 생성
+                    {{ $t('profile_setup.auto_generate') }}
                 </el-button>
             </div>
 
             <el-form :model="{ nickname }" label-position="top">
-                <el-form-item label="별명" required>
+                <el-form-item :label="$t('profile_setup.nickname')" required>
                     <el-input
                         v-model="nickname"
-                        placeholder="별명을 입력하세요"
+                        :placeholder="$t('my.nickname_placeholder')"
                         maxlength="20"
                         show-word-limit
                     />
@@ -129,9 +133,9 @@ const handleSkip = async () => {
         </div>
 
         <template #footer>
-            <el-button @click="handleSkip" :loading="uploading">건너뛰기</el-button>
+            <el-button @click="handleSkip" :loading="uploading">{{ $t('common.skip') }}</el-button>
             <el-button type="primary" @click="handleSubmit" :loading="uploading">
-                완료
+                {{ $t('common.complete') }}
             </el-button>
         </template>
     </el-dialog>

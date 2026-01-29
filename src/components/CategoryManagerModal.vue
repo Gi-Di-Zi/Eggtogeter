@@ -5,11 +5,14 @@ import { usePhotoStore } from '@/stores/photo' // Added
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Edit, Check, Close, CircleCheckFilled } from '@element-plus/icons-vue'
 import { supabase } from '@/lib/supabase'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   modelValue: boolean
   photoId?: string
 }>()
+
+const { t } = useI18n({ useScope: 'global' })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
@@ -108,7 +111,7 @@ const setAssignment = async (categoryId: number) => {
         }
     } catch (e) {
         console.error(e)
-        ElMessage.error('변경 실패')
+        ElMessage.error(t('category_manager.msg_change_fail'))
     }
 }
 
@@ -119,9 +122,9 @@ const handleAdd = async () => {
     await categoryStore.addCategory(newCategoryName.value.trim(), newCategoryColor.value)
     newCategoryName.value = ''
     newCategoryColor.value = '#409EFF'
-    ElMessage.success('카테고리가 추가되었습니다.')
+    ElMessage.success(t('category_manager.msg_added'))
   } catch (error) {
-    ElMessage.error('카테고리 추가 실패')
+    ElMessage.error(t('category_manager.msg_add_fail'))
   }
 }
 
@@ -136,9 +139,9 @@ const handleUpdate = async (id: number) => {
   try {
     await categoryStore.updateCategory(id, editName.value.trim(), editColor.value)
     editingId.value = null
-    ElMessage.success('수정되었습니다.')
+    ElMessage.success(t('category_manager.msg_updated'))
   } catch (error) {
-    ElMessage.error('수정 실패')
+    ElMessage.error(t('category_manager.msg_update_fail'))
   }
 }
 
@@ -151,9 +154,9 @@ const handleDelete = async (category: Category) => {
   
   try {
     await ElMessageBox.confirm(
-      `'${category.name}' 카테고리를 삭제하시겠습니까?`,
-      '삭제 확인',
-      { confirmButtonText: '삭제', cancelButtonText: '취소', type: 'warning' }
+      t('category_manager.delete_confirm_msg', { name: category.name }),
+      t('category_manager.delete_confirm_title'),
+      { confirmButtonText: t('category_manager.btn_delete'), cancelButtonText: t('category_manager.btn_cancel'), type: 'warning' }
     )
     
     await categoryStore.deleteCategory(category.id)
@@ -166,7 +169,7 @@ const handleDelete = async (category: Category) => {
              photoStore.updatePhotoCategory(props.photoId, undefined, undefined)
         }
     }
-    ElMessage.success('삭제되었습니다.')
+    ElMessage.success(t('category_manager.msg_deleted'))
   } catch (e) {
     // Cancelled
   }
@@ -176,7 +179,7 @@ const handleDelete = async (category: Category) => {
 <template>
   <el-dialog
     :model-value="modelValue"
-    title="카테고리 지정 및 관리"
+    :title="$t('category_manager.title')"
     width="450px"
     @close="handleClose"
     append-to-body
@@ -187,12 +190,12 @@ const handleDelete = async (category: Category) => {
         <el-color-picker v-model="newCategoryColor" size="small" />
         <el-input 
             v-model="newCategoryName" 
-            placeholder="새 카테고리 이름" 
+            :placeholder="$t('category_manager.ph_new_name')" 
             @keyup.enter="handleAdd"
             style="flex: 1"
         >
             <template #append>
-                <el-button :icon="Plus" @click="handleAdd" />
+                <el-button :icon="Plus" @click="handleAdd">{{ $t('category_manager.btn_add') }}</el-button>
             </template>
         </el-input>
       </div>
@@ -245,12 +248,12 @@ const handleDelete = async (category: Category) => {
                         ></span>
                         <span class="name">{{ category.name }}</span>
                         <el-tag 
-                            v-if="category.is_favorite" 
+                            v-if="category.is_favorite"
                             size="small" 
                             effect="dark" 
                             style="margin-left:5px; background-color: #FFD700; border-color: #FFD700; color: #333; font-weight: bold;"
                         >
-                            즐겨찾기
+                            {{ $t('category_manager.favorites') }}
                         </el-tag>
                     </div>
 

@@ -5,6 +5,24 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Edit } from '@element-plus/icons-vue'
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useLocale } from '@/composables/useLocale'
+import { computed } from 'vue'
+
+const { t } = useI18n()
+const { locale, setLocale } = useLocale()
+
+const currentLocale = computed({
+    get: () => locale.value,
+    set: (val) => setLocale(val)
+})
+
+const handleLocaleChange = (val: string | number | boolean | undefined) => {
+    if (typeof val === 'string') {
+        setLocale(val)
+        ElMessage.success(t('common.saved'))
+    }
+}
 
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
@@ -34,16 +52,16 @@ const handleAvatarChange = async (file: File) => {
       profileStore.profile?.nickname || '',
       file
     )
-    ElMessage.success('프로필 이미지가 업데이트되었습니다!')
+    ElMessage.success(t('my.msg_avatar_updated'))
   } catch (err) {
     console.error('Avatar update error:', err)
-    ElMessage.error('이미지 업데이트에 실패했습니다.')
+    ElMessage.error(t('my.update_image_failed'))
   }
 }
 
 const handleNicknameSave = async () => {
   if (!nickname.value.trim()) {
-    ElMessage.error('별명을 입력해주세요.')
+    ElMessage.error(t('my.warn_nickname'))
     return
   }
 
@@ -56,21 +74,21 @@ const handleNicknameSave = async () => {
       nickname.value.trim(),
       null
     )
-    ElMessage.success('별명이 업데이트되었습니다!')
+    ElMessage.success(t('my.msg_nickname_updated'))
     showNicknameModal.value = false
   } catch (err) {
     console.error('Nickname update error:', err)
-    ElMessage.error('별명 업데이트에 실패했습니다.')
+    ElMessage.error(t('my.update_nickname_failed'))
   }
 }
 
 const handleLogout = async () => {
   try {
     await authStore.signOut()
-    ElMessage.success('로그아웃 되었습니다.')
+    ElMessage.success(t('my.msg_logout'))
     router.push('/login')
   } catch (error) {
-    ElMessage.error('로그아웃 중 오류가 발생했습니다.')
+    ElMessage.error(t('my.msg_logout_error'))
   }
 }
 </script>
@@ -80,7 +98,7 @@ const handleLogout = async () => {
     <el-card class="profile-card">
       <template #header>
         <div class="card-header">
-          <h2>내 계정</h2>
+          <h2>{{ $t('my.title') }}</h2>
         </div>
       </template>
       
@@ -101,30 +119,41 @@ const handleLogout = async () => {
               class="clickable-avatar"
             />
           </el-upload>
-          <p class="hint">클릭하여 이미지 변경</p>
+          <p class="hint">{{ $t('my.avatar_hint') }}</p>
+        </div>
+
+        <el-divider />
+
+        <!-- Locale Setting -->
+        <div class="user-info">
+            <p class="label">{{ $t('common.language') }}</p>
+            <el-radio-group v-model="currentLocale" @change="handleLocaleChange">
+                <el-radio-button label="ko">한국어</el-radio-button>
+                <el-radio-button label="en">English</el-radio-button>
+            </el-radio-group>
         </div>
 
         <el-divider />
 
         <!-- User Info Section -->
         <div class="user-info">
-          <p class="label">별명</p>
+          <p class="label">{{ $t('my.nickname') }}</p>
           <div class="nickname-row">
-            <p class="value">{{ profileStore.profile?.nickname || '설정되지 않음' }}</p>
+            <p class="value">{{ profileStore.profile?.nickname || $t('my.not_set') }}</p>
             <el-button :icon="Edit" circle size="small" @click="openNicknameModal" />
           </div>
         </div>
 
         <div class="user-info">
-          <p class="label">이메일</p>
-          <p class="value">{{ authStore.user?.email || '정보 없음' }}</p>
+          <p class="label">{{ $t('my.email') }}</p>
+          <p class="value">{{ authStore.user?.email || $t('my.no_info') }}</p>
         </div>
         
         <el-divider />
 
         <!-- Logout Button -->
         <el-button type="danger" @click="handleLogout" class="logout-btn" plain>
-          로그아웃
+          {{ $t('common.logout') }}
         </el-button>
       </div>
     </el-card>
@@ -132,22 +161,22 @@ const handleLogout = async () => {
     <!-- Nickname Edit Modal -->
     <el-dialog
       v-model="showNicknameModal"
-      title="별명 변경"
+      :title="$t('my.change_nickname')"
       width="90%"
       style="max-width: 350px;"
       align-center
     >
       <el-input
         v-model="nickname"
-        placeholder="별명 입력"
+        :placeholder="$t('my.nickname_placeholder')"
         maxlength="20"
         show-word-limit
       />
 
       <template #footer>
-        <el-button @click="showNicknameModal = false">취소</el-button>
+        <el-button @click="showNicknameModal = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="handleNicknameSave" :loading="profileStore.loading">
-          저장
+          {{ $t('common.save') }}
         </el-button>
       </template>
     </el-dialog>
