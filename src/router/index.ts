@@ -69,6 +69,12 @@ const router = createRouter({
             name: 'my',
             component: () => import('../views/MyView.vue'),
             meta: { requiresAuth: true }
+        },
+        {
+            // 404 Not Found (Wildcard Match)
+            path: '/:pathMatch(.*)*',
+            name: 'not-found',
+            component: () => import('../views/NotFoundView.vue')
         }
     ]
 })
