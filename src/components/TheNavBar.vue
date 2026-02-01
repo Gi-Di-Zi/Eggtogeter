@@ -97,6 +97,7 @@ watch(() => authStore.user, (newVal) => {
   width: 100%;
   height: 100%;
   transition: color 0.3s;
+  text-align: center;
 }
 
 .nav-item:hover, .nav-item.active {
@@ -122,6 +123,7 @@ watch(() => authStore.user, (newVal) => {
   border-radius: 12px;
   padding: 5px 15px;
   transition: all 0.2s;
+  text-align: center;
 }
 
 .center-btn.active .upload-btn-container,

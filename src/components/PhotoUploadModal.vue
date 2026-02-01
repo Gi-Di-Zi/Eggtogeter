@@ -1,12 +1,13 @@
 ﻿<script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/lib/supabase'
 import { ElMessage } from 'element-plus'
 import exifr from 'exifr'
-import { useKakaoLoader } from '@/composables/useKakaoLoader'
-import { Plus, Calendar, Edit, Location, MapLocation, Search } from '@element-plus/icons-vue'
+
+import { Plus, Calendar, Edit, Location, MapLocation } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
+import PhotoLocationPicker from '@/components/PhotoLocationPicker.vue'
 
 const { t } = useI18n()
 
@@ -20,7 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
-const { loadDaumPostcode, loadKakaoMap } = useKakaoLoader()
+
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
@@ -34,15 +35,9 @@ const description = ref<string>('')
 const isUploading = ref(false)
 
 // Unified Location Helper State
+// Unified Location Helper State
 const showLocationHelper = ref(false)
-const mapContainer = ref<HTMLElement | null>(null)
-const mapInstance = ref<any>(null)
-const mapMarker = ref<any>(null)
-const tempLocation = ref<{ lat: number, lng: number, address: string } | null>(null)
 
-// Postcode Overlay State
-const showPostcodeOverlay = ref(false)
-const postcodeEmbedContainer = ref<HTMLElement | null>(null)
 
 // Watch visibility to clear state if needed
 watch(() => props.modelValue, (val) => {
@@ -68,6 +63,7 @@ const resetForm = () => {
     address.value = ''
     title.value = ''
     description.value = ''
+    if (fileInput.value) fileInput.value.value = ''
     if (fileInput.value) fileInput.value.value = ''
 }
 
@@ -153,15 +149,14 @@ const processFile = async (file: File) => {
 
 const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> => {
     return new Promise((resolve) => {
-        if (!window.kakao?.maps?.services) {
+        if (!window.google?.maps?.Geocoder) {
             resolve(null)
             return
         }
-        const geocoder = new window.kakao.maps.services.Geocoder()
-        geocoder.coord2Address(lng, lat, (result: any, status: any) => {
-            if (status === window.kakao.maps.services.Status.OK) {
-                const addr = result[0].road_address?.address_name || result[0].address?.address_name
-                resolve(addr)
+        const geocoder = new google.maps.Geocoder()
+        geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+            if (status === 'OK' && results && results[0]) {
+                resolve(results[0].formatted_address)
             } else {
                 resolve(null)
             }
@@ -172,105 +167,12 @@ const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> 
 // Unified Helper Logic
 const openLocationHelper = () => {
     showLocationHelper.value = true
-    showPostcodeOverlay.value = false // Start with map
-    nextTick(async () => {
-        await loadKakaoMap()
-        await loadDaumPostcode() // Preload both
-        initMap()
-    })
 }
 
-const initMap = async () => {
-    if (!mapContainer.value || !window.kakao?.maps) return
-
-    const initialLat = latitude.value || 37.5665
-    const initialLng = longitude.value || 126.9780
-
-    const options = {
-        center: new window.kakao.maps.LatLng(initialLat, initialLng),
-        level: 3
-    }
-
-    // Create map
-    if (!mapInstance.value) {
-        mapInstance.value = new window.kakao.maps.Map(mapContainer.value, options)
-        
-        // Marker
-        mapMarker.value = new window.kakao.maps.Marker({
-            position: new window.kakao.maps.LatLng(initialLat, initialLng)
-        })
-        mapMarker.value.setMap(mapInstance.value)
-
-        // Click event
-        window.kakao.maps.event.addListener(mapInstance.value, 'click', function(mouseEvent: any) {
-            const latlng = mouseEvent.latLng
-            updateTempLocation(latlng.getLat(), latlng.getLng())
-        })
-    } else {
-        // Resize and relayout if re-opening
-        mapInstance.value.relayout()
-        mapInstance.value.setCenter(new window.kakao.maps.LatLng(initialLat, initialLng))
-        mapMarker.value.setPosition(new window.kakao.maps.LatLng(initialLat, initialLng))
-    }
-
-    // Init temp location
-    const addr = await getAddressFromCoords(initialLat, initialLng)
-    tempLocation.value = { lat: initialLat, lng: initialLng, address: addr || t('upload.no_address_info') }
-}
-
-const updateTempLocation = async (lat: number, lng: number) => {
-    mapMarker.value.setPosition(new window.kakao.maps.LatLng(lat, lng))
-    mapInstance.value.panTo(new window.kakao.maps.LatLng(lat, lng))
-    
-    const addr = await getAddressFromCoords(lat, lng)
-    tempLocation.value = { lat, lng, address: addr || t('upload.no_address_info') }
-}
-
-// Postcode Overlay Logic
-const togglePostcodeSearch = () => {
-    showPostcodeOverlay.value = !showPostcodeOverlay.value
-    if (showPostcodeOverlay.value) {
-        nextTick(() => {
-            initPostcode()
-        })
-    }
-}
-
-const initPostcode = () => {
-    if (!postcodeEmbedContainer.value || !window.daum?.Postcode) return
-    
-    new window.daum.Postcode({
-        oncomplete: function(data: any) {
-             const fullAddress = data.address
-             handleAddressSelection(fullAddress)
-        },
-        width: '100%',
-        height: '100%'
-    }).embed(postcodeEmbedContainer.value)
-}
-
-const handleAddressSelection = (addr: string) => {
-    if (!window.kakao?.maps?.services) return
-    const geocoder = new window.kakao.maps.services.Geocoder()
-    
-    geocoder.addressSearch(addr, (result: any, status: any) => {
-        if (status === window.kakao.maps.services.Status.OK) {
-            const lat = parseFloat(result[0].y)
-            const lng = parseFloat(result[0].x)
-            
-            // Close overlay and update map
-            showPostcodeOverlay.value = false
-            updateTempLocation(lat, lng)
-        }
-    })
-}
-
-const confirmLocation = () => {
-    if (tempLocation.value) {
-        latitude.value = tempLocation.value.lat
-        longitude.value = tempLocation.value.lng
-        address.value = tempLocation.value.address
-    }
+const handleLocationConfirm = (payload: { lat: number, lng: number, address: string }) => {
+    latitude.value = payload.lat
+    longitude.value = payload.lng
+    address.value = payload.address
     showLocationHelper.value = false
 }
 
@@ -437,38 +339,13 @@ const registerPhoto = async () => {
     </div>
 
     <!-- Unified Location Helper Modal -->
-    <el-dialog
+    <PhotoLocationPicker
         v-model="showLocationHelper"
-        :title="$t('location_helper.title')"
-        width="90%"
-        style="max-width: 500px"
-        append-to-body
-        align-center
-    >
-        <div class="helper-header">
-            <el-button type="primary" :icon="Search" @click="togglePostcodeSearch" class="search-toggle-btn">
-                {{ showPostcodeOverlay ? $t('location_helper.back_to_map') : $t('location_helper.search') }}
-            </el-button>
-            <p v-if="!showPostcodeOverlay && tempLocation" class="current-selected-addr">
-                <el-icon><Location /></el-icon> {{ tempLocation.address || $t('location_helper.select_on_map') }}
-            </p>
-        </div>
-
-        <div class="map-wrapper">
-            <!-- Map Container -->
-            <div ref="mapContainer" class="map-picker-container"></div>
-            
-            <!-- Postcode Overlay -->
-            <div v-show="showPostcodeOverlay" class="postcode-overlay">
-                 <div ref="postcodeEmbedContainer" style="width: 100%; height: 100%;"></div>
-            </div>
-        </div>
-
-        <div class="map-picker-footer">
-            <el-button @click="showLocationHelper = false">{{ $t('common.cancel') }}</el-button>
-            <el-button type="primary" @click="confirmLocation" :disabled="!tempLocation">{{ $t('location_helper.confirm') }}</el-button>
-        </div>
-    </el-dialog>
+        :initial-lat="latitude"
+        :initial-lng="longitude"
+        :initial-address="address"
+        @confirm="handleLocationConfirm"
+    />
   </el-dialog>
 </template>
 
@@ -606,12 +483,81 @@ const registerPhoto = async () => {
     left: 0;
     width: 100%;
     height: 100%;
-    background: white;
+    background: rgba(255, 255, 255, 0.95);
     z-index: 10;
+    padding: 20px;
+    box-sizing: border-box; /* Fix width overflow */
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
 }
+
+/* Enhanced Autocomplete Styling */
+.location-input :deep(.el-input__wrapper) {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* Enhanced shadow */
+}
+
+.search-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.search-result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: #f9f9f9;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.search-result-item:hover {
+    background-color: #f0f0f0;
+}
+
+.result-info {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    overflow: hidden;
+    margin-right: 10px;
+}
+
+.result-name {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.result-address {
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.no-results {
+    text-align: center;
+    color: #888;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
+
 .map-picker-footer {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
 }
 </style>
+
+

@@ -7,7 +7,7 @@ import { ElMessage } from 'element-plus'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { VideoCamera, Timer, Memo, Picture, Close, Van, Ship, User, Right, Promotion, Location, Bicycle } from '@element-plus/icons-vue'
-import { useKakaoLoader } from '@/composables/useKakaoLoader'
+import { useGoogleMapsLoader } from '@/composables/useGoogleMapsLoader'
 import { calculateRoute } from '@/utils/routeCalculator'
 
 
@@ -27,6 +27,7 @@ const photoStore = usePhotoStore()
 const dialogVisible = ref(false)
 const currentStep = ref(0)
 const mapContainer = ref<HTMLElement | null>(null)
+const { loadGoogleMaps } = useGoogleMapsLoader()
 let map: any = null
 
 // Step 1: 기본 정보
@@ -153,19 +154,17 @@ const travelDuration = computed(() => {
 // Address Recovery Logic
 const startAddr = ref(t('album.create.step_confirm.start_point'))
 const endAddr = ref(t('album.create.step_confirm.end_point'))
-const { loadKakaoMap } = useKakaoLoader()
 
 const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> => {
   return new Promise((resolve) => {
-    if (!(window as any).kakao?.maps?.services) {
+    if (!google?.maps?.Geocoder) {
       resolve(null)
       return
     }
-    const geocoder = new (window as any).kakao.maps.services.Geocoder()
-    geocoder.coord2Address(lng, lat, (result: any, status: any) => {
-      if (status === (window as any).kakao.maps.services.Status.OK) {
-        const addr = result[0].road_address?.address_name || result[0].address?.address_name
-        resolve(addr)
+    const geocoder = new google.maps.Geocoder()
+    geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+      if (status === 'OK' && results && results[0]) {
+        resolve(results[0].formatted_address)
       } else {
         resolve(null)
       }
@@ -175,19 +174,23 @@ const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> 
 
 watch(sortedPhotos, async (photos) => {
   if (photos && photos.length > 0) {
-    await loadKakaoMap()
-    
-    // Recover addresses for all photos if missing
-    const recoveryPromises = photos.map(async (photo) => {
-      if (!photo.address?.trim() && photo.latitude && photo.longitude) {
-        const recovered = await getAddressFromCoords(photo.latitude, photo.longitude)
-        if (recovered) {
-          photo.address = recovered
-        }
-      }
-    })
-    
-    await Promise.all(recoveryPromises)
+    try {
+        await loadGoogleMaps()
+        
+        // Recover addresses for all photos if missing
+        const recoveryPromises = photos.map(async (photo) => {
+          if (!photo.address?.trim() && photo.latitude && photo.longitude) {
+            const recovered = await getAddressFromCoords(photo.latitude, photo.longitude)
+            if (recovered) {
+              photo.address = recovered
+            }
+          }
+        })
+        
+        await Promise.all(recoveryPromises)
+    } catch (e) {
+        console.error('Failed to load Google Maps or recover addresses', e)
+    }
 
     const first = photos[0]
     const last = photos[photos.length - 1]

@@ -10,6 +10,7 @@
         :progress="progress"
         :is-playing="isPlaying"
         :photos="photos"
+        :theme="mapTheme"
         @toggle-fullscreen="toggleFullscreen"
       />
       
@@ -144,6 +145,10 @@ const albumDateRange = computed(() => {
     const start = new Date(first.taken_at).toLocaleDateString()
     const end = new Date(last.taken_at).toLocaleDateString()
     return start === end ? start : `${start} - ${end}`
+})
+
+const mapTheme = computed(() => {
+    return albumStore.currentAlbum?.content_data?.settings?.mapTheme || 'STREET'
 })
 
 // Lifecycle

@@ -7,13 +7,15 @@ import * as turf from '@turf/turf'
 import { FullScreen } from '@element-plus/icons-vue'
 
 // Props receive the SHARED state from parent (which initializes useAlbumAnimation)
+// Props receive the SHARED state from parent (which initializes useAlbumAnimation)
 const props = defineProps<{
   routeLine: any
   progress: number
   isPlaying: boolean
   currentTransportMode: 'walk' | 'car' | 'airplane' | 'bicycle' | 'bus' | 'subway' | 'ship' | 'none'
   currentPosition: any // Turf Point
-  photos: any[] // Added
+  photos: any[]
+  theme?: string // Added theme prop
 }>()
 
 const mapContainer = ref<HTMLElement | null>(null)
@@ -35,6 +37,76 @@ const models = {
     ship: null as THREE.Group | null
 }
 
+const maptilerKey = import.meta.env.VITE_MAPTILER_KEY
+const mapStyles: Record<string, string> = {
+    STREET: `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`,
+    DARK: `https://api.maptiler.com/maps/dataviz-dark/style.json?key=${maptilerKey}`,
+    PASTEL: `https://api.maptiler.com/maps/pastel/style.json?key=${maptilerKey}`,
+    OUTDOOR: `https://api.maptiler.com/maps/outdoor-v2/style.json?key=${maptilerKey}`,
+    WINTER: `https://api.maptiler.com/maps/winter-v2/style.json?key=${maptilerKey}`,
+    HYBRID: `https://api.maptiler.com/maps/hybrid/style.json?key=${maptilerKey}`
+}
+
+const add3DBuildings = () => {
+    if (!map) return;
+    const style = map.getStyle();
+    if (!style || !style.sources) return;
+
+    // Skip 3D buildings for hybrid theme if it's too heavy or doesn't support it well
+    if (props.theme === 'HYBRID') return;
+
+    let sourceId = 'openmaptiles';
+    const sources = style.sources;
+    
+    if (sources['openmaptiles']) {
+        sourceId = 'openmaptiles';
+    } else if (sources['maptiler_planet']) {
+        sourceId = 'maptiler_planet';
+    } else if (sources['map']) {
+        sourceId = 'map';
+    } else {
+        const foundSource = Object.keys(sources).find(key => {
+            const s = sources[key];
+            return s && 'type' in s && s.type === 'vector';
+        });
+        if (foundSource) sourceId = foundSource;
+        else return;
+    }
+
+    if (map.getLayer('3d-buildings')) return;
+
+    const layers = style.layers;
+    let labelLayerId;
+    for (const layer of layers) {
+        if (layer.type === 'symbol' && layer.layout && 'text-field' in layer.layout) {
+            labelLayerId = layer.id;
+            break;
+        }
+    }
+
+    try {
+        map.addLayer(
+            {
+                'id': '3d-buildings',
+                'source': sourceId,
+                'source-layer': 'building',
+                'filter': ['all', ['!=', 'hide_3d', true]],
+                'type': 'fill-extrusion',
+                'minzoom': 13,
+                'paint': {
+                    'fill-extrusion-color': '#ffffff',
+                    'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 0],
+                    'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+                    'fill-extrusion-opacity': 0.2
+                }
+            },
+            labelLayerId
+        );
+    } catch (e) {
+        console.error('Failed to add 3D buildings layer:', e);
+    }
+}
+
 const emit = defineEmits(['map-loaded', 'toggle-fullscreen'])
 
 onMounted(() => {
@@ -48,35 +120,31 @@ onUnmounted(() => {
 const initMap = () => {
     if (!mapContainer.value) return
 
+    const styleUrl = mapStyles[props.theme || 'STREET'] || mapStyles.STREET
+
     map = new maplibregl.Map({
         container: mapContainer.value,
-        style: {
-             version: 8,
-             sources: {
-                 'vworld': {
-                     type: 'raster',
-                     tiles: ['https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png'],
-                     tileSize: 256,
-                     attribution: 'V-World'
-                 }
-             },
-             layers: [
-                 { id: 'bg', type: 'background', paint: { 'background-color': '#111' } },
-                 { id: 'vworld', type: 'raster', source: 'vworld' }
-             ]
-        },
+        style: styleUrl,
         center: [127.0, 37.5],
         zoom: 14,
-        pitch: 60, // Task 2: Increased pitch
-        interactive: false, // Task 2: View only
+        pitch: 60,
+        interactive: false,
         attributionControl: false
     })
 
     map.on('load', () => {
+        add3DBuildings()
         addRouteLayer()
         add3DLayer()
-        addPhotoMarkers() // Task 3: Map Markers
+        addPhotoMarkers()
         emit('map-loaded', map)
+    })
+
+    map.on('styledata', () => {
+        // Delay slightly to ensure sources are ready
+        setTimeout(() => {
+            add3DBuildings()
+        }, 300)
     })
 }
 

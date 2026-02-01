@@ -194,7 +194,8 @@
         "search": "Search Address",
         "back_to_map": "Back to Map",
         "select_on_map": "Select location on map",
-        "confirm": "Set to this location"
+        "confirm": "Set to this location",
+        "search_placeholder": "Search place or address"
     },
     "album": {
         "title": "Moving Album",

@@ -19,35 +19,14 @@ const mapContainer = ref<HTMLElement | null>(null)
 let map: maplibregl.Map | null = null
 let currentMarker: maplibregl.Marker | null = null
 
+const maptilerKey = import.meta.env.VITE_MAPTILER_KEY
+
 onMounted(() => {
   if (!mapContainer.value) return
 
   map = new maplibregl.Map({
     container: mapContainer.value,
-    style: {
-      version: 8,
-      sources: {
-        'vworld': {
-          type: 'raster',
-          tiles: ['https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          attribution: 'V-World'
-        }
-      },
-      layers: [
-        { id: 'bg', type: 'background', paint: { 'background-color': '#111' } },
-        { 
-          id: 'vworld', 
-          type: 'raster', 
-          source: 'vworld',
-          paint: {
-            'raster-saturation': -1, // Makes it grey
-            'raster-brightness-min': 0.2,
-            'raster-contrast': 0.1
-          }
-        }
-      ]
-    },
+    style: `https://api.maptiler.com/maps/dataviz-light/style.json?key=${maptilerKey}`,
     center: [0, 0],
     zoom: 1,
     interactive: false,

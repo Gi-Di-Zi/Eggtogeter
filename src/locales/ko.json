@@ -73,7 +73,8 @@
         "search": "주소 검색",
         "back_to_map": "지도로 돌아가기",
         "select_on_map": "지도에서 위치를 선택하세요",
-        "confirm": "이 위치로 설정"
+        "confirm": "이 위치로 설정",
+        "search_placeholder": "장소, 주소 검색"
     },
     "friends": {
         "title": "친구",

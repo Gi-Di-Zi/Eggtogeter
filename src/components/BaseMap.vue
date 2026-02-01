@@ -21,69 +21,126 @@ const emit = defineEmits<{
 const isPanelOpen = ref(false)
 const currentTheme = ref('Base') // Base, midnight, gray
 
-// Themes with Preview Tile URLs (Gyeongbokgung/Sejong-daero Area - Detailed Urban/Palace Mix)
+// Themes with Preview Tile URLs
 const themes = [
-    { label: '기본 (V-World)', value: 'Base', type: 'vworld', preview: 'https://xdworld.vworld.kr/2d/Base/service/16/55883/25375.png' },
-    { label: '컬러 (Voyager)', value: 'voyager', type: 'carto', preview: 'https://basemaps.cartocdn.com/rastertiles/voyager/16/55883/25375.png' },
-    { label: '회색조 (Positron)', value: 'light_all', type: 'carto', preview: 'https://basemaps.cartocdn.com/light_all/16/55883/25375.png' },
-    { label: '다크 (Dark)', value: 'dark_all', type: 'carto', preview: 'https://basemaps.cartocdn.com/dark_all/16/55883/25375.png' },
+    { label: '기본 (Maptiler)', value: 'streets-v2', type: 'maptiler', preview: 'https://api.maptiler.com/maps/streets-v2/0/0/0.png?key=' + import.meta.env.VITE_MAPTILER_KEY },
+    { label: '위성 (Hybrid)', value: 'hybrid', type: 'maptiler', preview: 'https://api.maptiler.com/maps/hybrid/0/0/0.jpg?key=' + import.meta.env.VITE_MAPTILER_KEY },
+    { label: '아웃도어 (Outdoor)', value: 'outdoor-v2', type: 'maptiler', preview: 'https://api.maptiler.com/maps/outdoor-v2/0/0/0.png?key=' + import.meta.env.VITE_MAPTILER_KEY },
+    { label: '윈터 (Winter)', value: 'winter-v2', type: 'maptiler', preview: 'https://api.maptiler.com/maps/winter-v2/0/0/0.png?key=' + import.meta.env.VITE_MAPTILER_KEY },
+    { label: '파스텔 (Pastel)', value: 'pastel', type: 'maptiler', preview: 'https://api.maptiler.com/maps/pastel/0/0/0.png?key=' + import.meta.env.VITE_MAPTILER_KEY },
+    { label: '다크 (Dark)', value: 'dataviz-dark', type: 'maptiler', preview: 'https://api.maptiler.com/maps/dataviz-dark/0/0/0.png?key=' + import.meta.env.VITE_MAPTILER_KEY },
 ]
 
 const togglePanel = () => {
     isPanelOpen.value = !isPanelOpen.value
 }
 
+const add3DBuildings = () => {
+    if (!map.value) return;
+    const style = map.value.getStyle();
+    if (!style || !style.sources) return;
+
+    // Detect the correct vector source (MapTiler styles often vary: 'openmaptiles', 'maptiler_planet', etc.)
+    let sourceId = 'openmaptiles';
+    const sources = style.sources;
+    
+    // Explicit check for known MapTiler source names
+    if (sources['openmaptiles']) {
+        sourceId = 'openmaptiles';
+    } else if (sources['maptiler_planet']) {
+        sourceId = 'maptiler_planet';
+    } else if (sources['map']) { // Sometimes just 'map'
+        sourceId = 'map';
+    } else {
+        // Fallback: find the first vector source
+        const foundSource = Object.keys(sources).find(key => {
+            const s = sources[key];
+            return s && s.type === 'vector';
+        });
+        
+        if (foundSource) {
+            sourceId = foundSource;
+        } else {
+            console.warn('No vector source found for 3D buildings');
+            return;
+        }
+    }
+    
+    console.log(`Adding 3D buildings using source: ${sourceId}`);
+
+    // Remove existing layer if present
+    if (map.value.getLayer('3d-buildings')) {
+        map.value.removeLayer('3d-buildings');
+    }
+
+    const layers = style.layers;
+    let labelLayerId;
+    
+    // Insert the layer beneath any symbol layer.
+    for (let i = 0; i < layers.length; i++) {
+        const layer = layers[i];
+        // Note: layer should exist, but extra safety check
+        if (!layer) continue;
+        
+        if (layer.type === 'symbol' && layer.layout && 'text-field' in layer.layout) {
+            labelLayerId = layer.id;
+            break;
+        }
+    }
+
+    try {
+        map.value.addLayer(
+            {
+                'id': '3d-buildings',
+                'source': sourceId,
+                'source-layer': 'building',
+                'filter': [
+                'all',
+                ['!=', 'hide_3d', true]
+            ],
+            'type': 'fill-extrusion',
+            'minzoom': 13,
+            'paint': {
+                'fill-extrusion-color': '#ffffff',
+                'fill-extrusion-height': [
+                    'coalesce', ['get', 'render_height'], ['get', 'height'], 0
+                ],
+                'fill-extrusion-base': [
+                     'coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0
+                ],
+                'fill-extrusion-opacity': 0.2
+            }
+        },
+        labelLayerId
+    );
+    } catch (e) {
+        console.error('Failed to add 3D buildings layer:', e);
+    }
+}
+
+
 const changeTheme = (themeValue: string) => {
     if (!map.value) return
     currentTheme.value = themeValue
-    // Panel stays open for exploration
 
-    // Find theme object to determine type
-    const selectedTheme = themes.find(t => t.value === themeValue)
-    const isCarto = selectedTheme?.type === 'carto'
-
-    let tilesUrl = ''
-    let attribution = ''
-
-    if (isCarto) {
-        if (themeValue === 'voyager') {
-             tilesUrl = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png`
-        } else {
-             tilesUrl = `https://basemaps.cartocdn.com/${themeValue}/{z}/{x}/{y}{r}.png`
-        }
-        attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-    } else {
-        // V-World Default
-        tilesUrl = `https://xdworld.vworld.kr/2d/${themeValue}/service/{z}/{x}/{y}.png`
-        attribution = '&copy; <a href="http://www.vworld.kr/">VWorld</a>'
+    const key = import.meta.env.VITE_MAPTILER_KEY
+    if (!key) {
+        console.error('Maptiler Key Missing')
+        return
     }
 
-    const style = {
-        version: 8,
-        sources: {
-            'raster-tiles': {
-                type: 'raster',
-                tiles: [tilesUrl],
-                tileSize: 256,
-                attribution: attribution
-            }
-        },
-        layers: [
-            {
-                id: 'raster-layer',
-                type: 'raster',
-                source: 'raster-tiles',
-                minzoom: 0, 
-                maxzoom: 19
-            }
-        ]
-    } as any
+    // Always use MapTiler Vector Styles now
+    map.value.setStyle(`https://api.maptiler.com/maps/${themeValue}/style.json?key=${key}`)
 
-    map.value.setStyle(style)
-    
-    // Changing style removes markers/layers, need to re-add them after style load
     map.value.once('styledata', () => {
          renderMarkers()
+         // Add 3D buildings for all themes except hybrid
+         if (themeValue !== 'hybrid') {
+             // Slight delay to ensure style is fully settled and sources are available
+             setTimeout(() => {
+                 add3DBuildings()
+             }, 200)
+         }
     })
 }
 
@@ -108,12 +165,9 @@ const renderMarkers = () => {
         } else {
             // Text-only Marker (Overlay Card Style)
             el.className = 'text-marker'
-            // User requested Description instead of Title
-            // Fallback to title if description is empty, then generic text
             el.innerText = photo.description || photo.title || '기록'
             
             const color = photo.category_color || '#409eff'
-            // Use color for text, NO border (User "remove blue mark on left")
             el.style.color = color
         }
 
@@ -155,36 +209,26 @@ onMounted(async () => {
   // Default: Seoul City Hall
   let center: [number, number] = [126.9780, 37.5665]
   
-  // Initial style (Default is Base/V-World)
+  // Initial style: Maptiler Streets
+  const maptilerKey = import.meta.env.VITE_MAPTILER_KEY
+  const initialStyle = maptilerKey 
+    ? `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`
+    : { version: 8, sources: {}, layers: [] } // Fallback/Empty
+
   map.value = new maplibregl.Map({
     container: mapContainer.value,
-
-    style: {
-      version: 8,
-      sources: {
-        'raster-tiles': {
-          type: 'raster',
-          tiles: ['https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          attribution: '&copy; <a href="http://www.vworld.kr/">VWorld</a>'
-        }
-      },
-      layers: [
-        {
-          id: 'raster-layer',
-          type: 'raster',
-          source: 'raster-tiles',
-          minzoom: 6,
-          maxzoom: 19
-        }
-      ]
-    } as any,
+    style: initialStyle as any, // URL or Style Object
     center: center,
-    zoom: 15
+    zoom: 15,
+    pitch: 45, // Add pitch for 3D effect
+    bearing: -17.6 // Add detailed bearing
   })
 
 
   map.value.on('load', async () => {
+      // Add 3D Buildings on initial load if not hybrid (default is streets-v2, so yes)
+      add3DBuildings()
+
       if (authStore.user?.id) {
           // Map should show shared photos too
           await photoStore.fetchPhotos(authStore.user.id, true)
@@ -237,6 +281,7 @@ const flyTo = (lat: number, lng: number) => {
         map.value.flyTo({
             center: [lng, lat],
             zoom: 17,
+            pitch: 50, // Increase pitch on zoom in
             speed: 1.2
         })
     }

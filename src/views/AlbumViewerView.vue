@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 import { ArrowLeft, VideoPlay, VideoPause, Refresh, Location, Loading as ElIconLoading } from '@element-plus/icons-vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useKakaoLoader } from '@/composables/useKakaoLoader'
+import { useGoogleMapsLoader } from '@/composables/useGoogleMapsLoader'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,11 +22,12 @@ const currentPhotoIndex = ref(0)
 const playbackSpeed = computed(() => albumStore.currentAlbum?.content_data?.settings?.playbackSpeed || 1)
 
 // Map Themes Mapping (same as CreateAlbumModal)
+const key = import.meta.env.VITE_MAPTILER_KEY
 const mapStyles = {
-  STREET: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
-  DARK: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-  LIGHT: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-  OUTDOOR: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json' // Voyager as fallback for outdoor
+  STREET: `https://api.maptiler.com/maps/streets-v2/style.json?key=${key}`,
+  DARK: `https://api.maptiler.com/maps/basic-v2-dark/style.json?key=${key}`,
+  LIGHT: `https://api.maptiler.com/maps/basic-v2-light/style.json?key=${key}`,
+  OUTDOOR: `https://api.maptiler.com/maps/outdoor-v2/style.json?key=${key}`
 }
 
 onMounted(async () => {
@@ -41,17 +42,17 @@ onMounted(async () => {
   const rawPhotos = await albumStore.fetchAlbumPhotos(albumId)
   
   if (rawPhotos.length > 0) {
-    const { loadKakaoMap } = useKakaoLoader()
-    await loadKakaoMap()
+    const { loadGoogleMaps } = useGoogleMapsLoader()
+    await loadGoogleMaps()
     
-    const geocoder = new window.kakao.maps.services.Geocoder()
+    const geocoder = new google.maps.Geocoder()
     const recoveryPromises = rawPhotos.map(async (photo: any) => {
       // 주소가 비어있거나 '주소 정보 없음'인 경우 복구 시도
       if (!photo.address?.trim() && photo.latitude && photo.longitude) {
         return new Promise<void>((resolve) => {
-          geocoder.coord2Address(photo.longitude, photo.latitude, (result: any, status: any) => {
-            if (status === window.kakao.maps.services.Status.OK) {
-              photo.address = result[0].road_address?.address_name || result[0].address?.address_name
+          geocoder.geocode({ location: { lat: photo.latitude, lng: photo.longitude } }, (results: any, status: any) => {
+            if (status === 'OK' && results && results[0]) {
+              photo.address = results[0].formatted_address
             }
             resolve()
           })
