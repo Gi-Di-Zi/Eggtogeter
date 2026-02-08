@@ -61,10 +61,11 @@
     "profile_setup": {
         "title": "Profile Setup",
         "nickname": "Nickname",
-        "auto_generate": "Auto Generate Image",
+        "random_generation": "Random Generation",
         "warn_nickname_first": "Please enter a nickname first.",
         "msg_success": "Profile setup complete!",
-        "warn_skip": "Please enter a nickname before skipping.",
+        "msg_random_generated": "Random nickname '{nickname}' generated!",
+        "upload_hint": "Click to change image",
         "error_setup": "Failed to setup profile."
     },
     "detail": {

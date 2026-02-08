@@ -25,6 +25,13 @@ const selectedPhoto = ref<Photo | null>(null)
 // Ensure we have data when entering this view
 onMounted(() => {
     categoryStore.fetchCategories()
+    
+    // Fix: Clear friend filter (e.g. "user:...") when entering My Photo Management
+    // 홈 화면에서 친구 필터를 켠 채로 이동했을 때, 관리 화면 select box에 'user:uuid'가 노출되는 현상 방지
+    if (typeof photoStore.filterCategoryId === 'string') {
+        photoStore.setFilterCategoryId(null)
+    }
+
     // Don't refetch - use existing photos from store (keeps map showing shared photos)
 })
 
@@ -137,6 +144,12 @@ const getCardStyle = (photo: Photo) => {
     }
 }
 
+// Filter out "user:..." categories (friend shares) for this view
+// Since this is "My Photo Management", we only want standard categories.
+const availableCategories = computed(() => {
+    return categoryStore.categories.filter(c => !c.name.startsWith('user:'))
+})
+
 </script>
 
 <template>
@@ -189,7 +202,7 @@ const getCardStyle = (photo: Photo) => {
                     @change="photoStore.setFilterCategoryId"
                 >
                     <el-option
-                        v-for="cat in categoryStore.categories"
+                        v-for="cat in availableCategories"
                         :key="cat.id"
                         :label="cat.name"
                         :value="cat.id"

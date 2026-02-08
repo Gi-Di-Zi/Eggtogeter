@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useProfileStore } from '@/stores/profile'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
-import { User, Upload } from '@element-plus/icons-vue'
+import { User } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -35,14 +35,31 @@ const handleAvatarChange = (file: File) => {
     reader.readAsDataURL(file)
 }
 
-const handleAutoGenerate = () => {
-    if (!nickname.value.trim()) {
-        ElMessage.warning(t('profile_setup.warn_nickname_first'))
-        return
-    }
-    // Clear file and set preview to auto-generated avatar
+const ADJECTIVES = ['Happy', 'Lucky', 'Sunny', 'Fast', 'Smart', 'Cool', 'Bright', 'Kind', 'Brave', 'Calm']
+const NOUNS = ['Traveler', 'Explorer', 'Friend', 'Neighbor', 'Artist', 'Chef', 'Runner', 'Dreamer', 'Pioneer', 'Walker']
+
+const generateRandomNickname = () => {
+    const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]
+    const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)]
+    // Add random number to ensure uniqueness if needed, but simple combo is friendlier
+    // Let's add 2 digits
+    const num = Math.floor(Math.random() * 99) + 1
+    return `${adj}${noun}${num}`
+}
+
+const handleRandom = async () => {
+    // Generate random nickname
+    const newNickname = generateRandomNickname()
+    nickname.value = newNickname
+    
+    // Auto-generate avatar preview for better UX before submit
     avatarFile.value = null
-    avatarPreview.value = profileStore.generateAvatarUrl(nickname.value.trim())
+    avatarPreview.value = profileStore.generateAvatarUrl(newNickname)
+    
+    ElMessage.info(t('profile_setup.msg_random_generated', { nickname: newNickname }))
+    
+    // Submit immediately as requested ("바로 가입/완료")
+    await handleSubmit()
 }
 
 const handleSubmit = async () => {
@@ -73,15 +90,6 @@ const handleSubmit = async () => {
         uploading.value = false
     }
 }
-
-const handleSkip = async () => {
-    if (!nickname.value.trim()) {
-        ElMessage.error(t('profile_setup.warn_skip'))
-        return
-    }
-    // Skip avatar upload, auto-generate from nickname
-    await handleSubmit()
-}
 </script>
 
 <template>
@@ -111,13 +119,7 @@ const handleSkip = async () => {
                         class="clickable-avatar"
                     />
                 </el-upload>
-                <el-button 
-                    @click="handleAutoGenerate" 
-                    size="small"
-                    :icon="Upload"
-                >
-                    {{ $t('profile_setup.auto_generate') }}
-                </el-button>
+                <!-- Manual Auto Generate Button Removed -->
             </div>
 
             <el-form :model="{ nickname }" label-position="top">
@@ -133,7 +135,7 @@ const handleSkip = async () => {
         </div>
 
         <template #footer>
-            <el-button @click="handleSkip" :loading="uploading">{{ $t('common.skip') }}</el-button>
+            <el-button @click="handleRandom" :loading="uploading">{{ $t('profile_setup.random_generation') }}</el-button>
             <el-button type="primary" @click="handleSubmit" :loading="uploading">
                 {{ $t('common.complete') }}
             </el-button>

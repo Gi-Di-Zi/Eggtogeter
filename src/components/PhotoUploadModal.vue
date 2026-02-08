@@ -32,6 +32,7 @@ const longitude = ref<number | null>(null)
 const address = ref<string>('')
 const title = ref<string>('')
 const description = ref<string>('')
+const visibility = ref<'private' | 'friends' | 'specific'>('private')
 const isUploading = ref(false)
 
 // Unified Location Helper State
@@ -63,6 +64,7 @@ const resetForm = () => {
     address.value = ''
     title.value = ''
     description.value = ''
+    visibility.value = 'private'
     if (fileInput.value) fileInput.value.value = ''
     if (fileInput.value) fileInput.value.value = ''
 }
@@ -215,6 +217,7 @@ const registerPhoto = async () => {
                 description: description.value,
                 title: title.value,
                 address: address.value,
+                visibility: visibility.value,
                 created_at: new Date()
             })
 
@@ -302,6 +305,7 @@ const registerPhoto = async () => {
                     :placeholder="$t('upload.ph_desc')" 
                 />
             </div>
+            
 
             <div class="form-item">
                 <label><el-icon><Calendar /></el-icon> {{ $t('upload.label_date') }}</label>
@@ -446,6 +450,21 @@ const registerPhoto = async () => {
 .submit-btn {
     width: 100%;
     font-weight: bold;
+}
+.visibility-group {
+    width: 100%;
+}
+.visibility-group :deep(.el-radio-button) {
+    flex: 1;
+}
+.visibility-group :deep(.el-radio-button__inner) {
+    width: 100%;
+}
+.visibility-hint {
+    margin: 8px 0 0;
+    font-size: 0.85rem;
+    color: #909399;
+    line-height: 1.4;
 }
 .helper-header {
     display: flex;

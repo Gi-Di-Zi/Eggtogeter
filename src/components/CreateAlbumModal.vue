@@ -6,9 +6,58 @@ import { usePhotoStore } from '@/stores/photo'
 import { ElMessage } from 'element-plus'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { VideoCamera, Timer, Memo, Picture, Close, Van, Ship, User, Right, Promotion, Location, Bicycle } from '@element-plus/icons-vue'
+import { VideoCamera, Timer, Memo, Picture, Close, Ship, User, Right, Promotion, Bicycle } from '@element-plus/icons-vue'
 import { useGoogleMapsLoader } from '@/composables/useGoogleMapsLoader'
 import { calculateRoute } from '@/utils/routeCalculator'
+import { h } from 'vue'
+
+// Custom SVG Icons - Simplified & Larger (공유 디자인)
+const BusIcon = () => h('svg', {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '2.5',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  style: 'width: 18px; height: 18px; color: currentColor; display: inline-block; vertical-align: middle;'
+}, [
+  h('rect', { x: '4', y: '6', width: '16', height: '10', rx: '2' }),
+  h('rect', { x: '6', y: '8', width: '4', height: '3', rx: '0.5' }),
+  h('rect', { x: '14', y: '8', width: '4', height: '3', rx: '0.5' }),
+  h('circle', { cx: '8', cy: '18', r: '1.5' }),
+  h('circle', { cx: '16', cy: '18', r: '1.5' })
+])
+
+const CarIcon = () => h('svg', {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '2.5',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  style: 'width: 18px; height: 18px; color: currentColor; display: inline-block; vertical-align: middle;'
+}, [
+  h('path', { d: 'M7 16h10M5 12h14c1 0 2 1 2 2v2H3v-2c0-1 1-2 2-2z' }),
+  h('path', { d: 'M8.5 12l1-4h7l1 4' }),
+  h('circle', { cx: '8', cy: '18', r: '1.5' }),
+  h('circle', { cx: '16', cy: '18', r: '1.5' })
+])
+
+const SubwayIcon = () => h('svg', {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '2.5',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  style: 'width: 18px; height: 18px; color: currentColor; display: inline-block; vertical-align: middle;'
+}, [
+  h('rect', { x: '5', y: '5', width: '14', height: '12', rx: '2' }),
+  h('circle', { cx: '9', cy: '10', r: '1.5' }),
+  h('circle', { cx: '15', cy: '10', r: '1.5' }),
+  h('line', { x1: '9', y1: '17', x2: '7', y2: '19' }),
+  h('line', { x1: '15', y1: '17', x2: '17', y2: '19' })
+])
 
 
 const props = defineProps<{
@@ -35,8 +84,8 @@ const title = ref('')
 const description = ref('')
 const styleType = ref<'route_anim' | 'scroll_view' | 'ai_video'>('route_anim')
 
-// Step 4: 스타일 세부 설정 (신규 필드들)
-const mapTheme = ref('light')
+// Step 4: 스타일 세부 설정
+const photoFrameStyles = ref<Record<string, 'classic' | 'vintage' | 'neon' | 'gradient' | 'retro' | 'modern'>>({})
 
 // Transitions Data (Step 3)
 const transitions = ref<{ from: string, to: string, mode: string }[]>([])
@@ -172,12 +221,13 @@ const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> 
   })
 }
 
-watch(sortedPhotos, async (photos) => {
+watch(filteredPhotos, async (photos) => {
   if (photos && photos.length > 0) {
     try {
         await loadGoogleMaps()
         
-        // Recover addresses for all photos if missing
+        // Recover addresses for ANY visible photo if missing
+        // Using a throttled approach or just batching could be safer but for now parallel is fine given low photo counts
         const recoveryPromises = photos.map(async (photo) => {
           if (!photo.address?.trim() && photo.latitude && photo.longitude) {
             const recovered = await getAddressFromCoords(photo.latitude, photo.longitude)
@@ -191,7 +241,11 @@ watch(sortedPhotos, async (photos) => {
     } catch (e) {
         console.error('Failed to load Google Maps or recover addresses', e)
     }
+  }
+}, { immediate: true })
 
+watch(sortedPhotos, async (photos) => {
+  if (photos && photos.length > 0) {
     const first = photos[0]
     const last = photos[photos.length - 1]
     
@@ -221,6 +275,14 @@ watch(sortedPhotos, async (photos) => {
       })
     }
     transitions.value = newTransitions
+    
+    // Initialize Photo Frame Styles with default value
+    const newFrameStyles: Record<string, 'classic' | 'vintage' | 'neon' | 'gradient' | 'retro' | 'modern'> = {}
+    photos.forEach(photo => {
+      // Preserve existing style if already set, otherwise default to 'default'
+      newFrameStyles[photo.id] = photoFrameStyles.value[photo.id] || 'classic'
+    })
+    photoFrameStyles.value = newFrameStyles
   } else {
     startAddr.value = t('album.create.step_confirm.start_point')
     endAddr.value = t('album.create.step_confirm.end_point')
@@ -365,6 +427,7 @@ watch(() => props.modelValue, (val) => {
     description.value = ''
     styleType.value = 'route_anim'
     selectedPhotoIds.value = []
+    photoFrameStyles.value = {}
   }
 })
 
@@ -377,7 +440,7 @@ const canProceed = computed(() => {
     return title.value.trim().length > 0
   }
   if (currentStep.value === 1) {
-    return selectedPhotoIds.value.length > 0
+    return selectedPhotoIds.value.length >= 2  // 최소 2장 필요
   }
   return true
 })
@@ -389,8 +452,21 @@ const handleNext = () => {
        return
   }
   
+  // Step 1: 사진 선택 검증 (최소 2장)
+  if (currentStep.value === 1 && selectedPhotoIds.value.length < 2) {
+    ElMessage.warning(t('album.create.step_photos.min_photos_warning'))
+    return
+  }
+  
   if (currentStep.value < 3) {
     currentStep.value++
+  }
+}
+
+// 이전 단계로 이동 (뒤로 가기만 허용)
+const goToStep = (step: number) => {
+  if (step < currentStep.value) {
+    currentStep.value = step
   }
 }
 
@@ -415,7 +491,7 @@ const handleCreate = async () => {
   try {
     // Save style settings in content_data (simplified for now)
     const extraOptions = {
-      mapTheme: mapTheme.value,
+      photoFrameStyles: photoFrameStyles.value
     }
 
     await albumStore.createAlbum(
@@ -452,10 +528,10 @@ const handleCreate = async () => {
       </div>
     </template>
     <el-steps :active="currentStep" finish-status="success" align-center>
-      <el-step :title="$t('album.create.steps.basic_info')" />
-      <el-step :title="$t('album.create.steps.select_photos')" />
-      <el-step :title="$t('album.create.steps.confirm_info')" />
-      <el-step :title="$t('album.create.steps.style_settings')" />
+      <el-step :title="$t('album.create.steps.basic_info')" @click="goToStep(0)" style="cursor: pointer;" />
+      <el-step :title="$t('album.create.steps.select_photos')" @click="goToStep(1)" style="cursor: pointer;" />
+      <el-step :title="$t('album.create.steps.confirm_info')" @click="goToStep(2)" style="cursor: pointer;" />
+      <el-step :title="$t('album.create.steps.style_settings')" @click="goToStep(3)" style="cursor: pointer;" />
     </el-steps>
 
     <div class="step-content">
@@ -681,13 +757,7 @@ const handleCreate = async () => {
             {{ $t('album.create.step_style.detail_settings', { style: styleOptions.find(o => o.value === styleType)?.label }) }}
           </h3>
           <el-form>
-            <el-form-item :label="$t('album.create.step_style.map_theme')">
-              <el-radio-group v-model="mapTheme">
-                <el-radio-button label="light">{{ $t('album.create.step_style.theme_light') }}</el-radio-button>
-                <el-radio-button label="dark">{{ $t('album.create.step_style.theme_dark') }}</el-radio-button>
-                <el-radio-button label="outdoor">{{ $t('album.create.step_style.theme_outdoor') }}</el-radio-button>
-              </el-radio-group>
-            </el-form-item>
+            <!-- 지도 테마 제거됨 -->
           </el-form>
 
           <!-- Route Animation 설정 (신규) -->
@@ -724,36 +794,82 @@ const handleCreate = async () => {
                       style="width: 140px;"
                       :placeholder="$t('album.create.step_style.transport_placeholder')"
                     >
-                       <template #prefix>
-                         <el-icon v-if="item.transition.mode === 'walk'"><User /></el-icon>
-                         <el-icon v-else-if="item.transition.mode === 'car'"><Van /></el-icon>
-                         <el-icon v-else-if="item.transition.mode === 'bus'"><Van /></el-icon>
-                         <el-icon v-else-if="item.transition.mode === 'subway'"><Location /></el-icon>
-                         <el-icon v-else-if="item.transition.mode === 'airplane'"><Promotion /></el-icon>
-                         <el-icon v-else-if="item.transition.mode === 'ship'"><Ship /></el-icon>
-                         <el-icon v-else-if="item.transition.mode === 'bicycle'"><Bicycle /></el-icon>
+                      <template #prefix>
+                        <el-icon v-if="item.transition.mode === 'walk'"><User /></el-icon>
+                        <CarIcon v-else-if="item.transition.mode === 'car'" />
+                        <BusIcon v-else-if="item.transition.mode === 'bus'" />
+                        <SubwayIcon v-else-if="item.transition.mode === 'subway'" />
+                        <el-icon v-else-if="item.transition.mode === 'airplane'"><Promotion /></el-icon>
+                        <el-icon v-else-if="item.transition.mode === 'ship'"><Ship /></el-icon>
+                        <el-icon v-else-if="item.transition.mode === 'bicycle'"><Bicycle /></el-icon>
                       </template>
-                      <el-option :label="$t('album.create.step_style.transports.walk')" value="walk"><span>🚶 {{ $t('album.create.step_style.transports.walk') }}</span></el-option>
-                      <el-option :label="$t('album.create.step_style.transports.car')" value="car"><span>🚗 {{ $t('album.create.step_style.transports.car') }}</span></el-option>
-                      <el-option :label="$t('album.create.step_style.transports.bus')" value="bus"><span>🚌 {{ $t('album.create.step_style.transports.bus') }}</span></el-option>
-                      <el-option :label="$t('album.create.step_style.transports.subway')" value="subway"><span>🚇 {{ $t('album.create.step_style.transports.subway') }}</span></el-option>
-                      <el-option :label="$t('album.create.step_style.transports.airplane')" value="airplane"><span>✈️ {{ $t('album.create.step_style.transports.airplane') }}</span></el-option>
-                      <el-option :label="$t('album.create.step_style.transports.ship')" value="ship"><span>🚢 {{ $t('album.create.step_style.transports.ship') }}</span></el-option>
-                      <el-option :label="$t('album.create.step_style.transports.bicycle')" value="bicycle"><span>🚲 {{ $t('album.create.step_style.transports.bicycle') }}</span></el-option>
+                      <el-option :label="$t('album.create.step_style.transports.walk')" value="walk"><el-icon><User /></el-icon> {{ $t('album.create.step_style.transports.walk') }}</el-option>
+                      <el-option :label="$t('album.create.step_style.transports.car')" value="car"><CarIcon /> {{ $t('album.create.step_style.transports.car') }}</el-option>
+                      <el-option :label="$t('album.create.step_style.transports.bus')" value="bus"><BusIcon /> {{ $t('album.create.step_style.transports.bus') }}</el-option>
+                      <el-option :label="$t('album.create.step_style.transports.subway')" value="subway"><SubwayIcon /> {{ $t('album.create.step_style.transports.subway') }}</el-option>
+                      <el-option :label="$t('album.create.step_style.transports.airplane')" value="airplane"><el-icon><Promotion /></el-icon> {{ $t('album.create.step_style.transports.airplane') }}</el-option>
+                      <el-option :label="$t('album.create.step_style.transports.ship')" value="ship"><el-icon><Ship /></el-icon> {{ $t('album.create.step_style.transports.ship') }}</el-option>
+                      <el-option :label="$t('album.create.step_style.transports.bicycle')" value="bicycle"><el-icon><Bicycle /></el-icon> {{ $t('album.create.step_style.transports.bicycle') }}</el-option>
                       <el-option :label="$t('album.create.step_style.transports.none')" value="none">{{ $t('album.create.step_style.transports.none') }}</el-option>
                     </el-select>
                  </div>
               </template>
             </div>
-          </div>
-          
-          <div class="style-preview-tip">
-            <el-alert
-              :title="$t('album.create.step_style.settings_tip')"
-              type="info"
-              show-icon
-              :closable="false"
-            />
+            
+            <!-- 사진 프레임 스타일 설정 (신규) -->
+            <el-divider content-position="left">{{ $t('album.create.step_style.frame_settings') }}</el-divider>
+            <div class="frame-settings-list">
+              <div v-for="item in timelineItems" :key="item.photo.id + '_frame'" class="frame-setting-row">
+                <div class="photo-preview-info">
+                  <span class="photo-badge">{{ item.index + 1 }}</span>
+                  <img :src="item.photo.publicUrl || item.photo.storage_path" class="photo-thumbnail-small" />
+                  <span class="photo-title-text">{{ item.photo.title || '사진' }}</span>
+                </div>
+                <el-select 
+                  v-model="photoFrameStyles[item.photo.id]" 
+                  size="small" 
+                  style="width: 200px;"
+                  :placeholder="$t('album.create.step_style.frame_placeholder')"
+                >
+                  <el-option :label="$t('album.create.step_style.frames.classic')" value="classic">
+                    <div class="frame-option">
+                      <div class="frame-preview frame-preview-classic"></div>
+                      <span>{{ $t('album.create.step_style.frames.classic') }}</span>
+                    </div>
+                  </el-option>
+                  <el-option :label="$t('album.create.step_style.frames.vintage')" value="vintage">
+                    <div class="frame-option">
+                      <div class="frame-preview frame-preview-vintage"></div>
+                      <span>{{ $t('album.create.step_style.frames.vintage') }}</span>
+                    </div>
+                  </el-option>
+                  <el-option :label="$t('album.create.step_style.frames.neon')" value="neon">
+                    <div class="frame-option">
+                      <div class="frame-preview frame-preview-neon"></div>
+                      <span>{{ $t('album.create.step_style.frames.neon') }}</span>
+                    </div>
+                  </el-option>
+                  <el-option :label="$t('album.create.step_style.frames.gradient')" value="gradient">
+                    <div class="frame-option">
+                      <div class="frame-preview frame-preview-gradient"></div>
+                      <span>{{ $t('album.create.step_style.frames.gradient') }}</span>
+                    </div>
+                  </el-option>
+                  <el-option :label="$t('album.create.step_style.frames.retro')" value="retro">
+                    <div class="frame-option">
+                      <div class="frame-preview frame-preview-retro"></div>
+                      <span>{{ $t('album.create.step_style.frames.retro') }}</span>
+                    </div>
+                  </el-option>
+                  <el-option :label="$t('album.create.step_style.frames.modern')" value="modern">
+                    <div class="frame-option">
+                      <div class="frame-preview frame-preview-modern"></div>
+                      <span>{{ $t('album.create.step_style.frames.modern') }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1466,6 +1582,64 @@ export default {
   border: 1px solid #ebeef5;
 }
 
+.frame-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 5px;
+  margin-top: 15px;
+}
+
+.frame-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+}
+
+.photo-preview-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.photo-badge {
+  background: #409EFF;
+  color: white;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.photo-thumbnail-small {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid #dcdfe6;
+}
+
+.photo-title-text {
+  font-size: 13px;
+  color: #606266;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .route-segment-info {
   display: flex;
   align-items: center;
@@ -1514,5 +1688,87 @@ export default {
 
 .segment-arrow {
   color: #dcdfe6;
+}
+
+/* Frame Style Preview (select-box 옵션 미리보기) */
+.frame-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.frame-preview {
+  width: 32px;
+  height: 24px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.frame-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.frame-preview {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.frame-preview-classic {
+  background: #faf9f6;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.frame-preview-vintage {
+  background: linear-gradient(135deg, #d4a574 0%, #b8956a 100%);
+  border: 2px solid #c9a875;
+  filter: sepia(30%);
+}
+
+.frame-preview-neon {
+  background: #1a1a2e;
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(#1a1a2e, #1a1a2e),
+    linear-gradient(45deg, #ff0080, #ff8c00, #40e0d0);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: 0 0 8px rgba(255, 0, 128, 0.6);
+}
+
+.frame-preview-gradient {
+  background: #ffffff;
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(#fff, #fff),
+    linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.frame-preview-retro {
+  background: repeating-linear-gradient(
+    45deg,
+    #ffb6c1,
+    #ffb6c1 3px,
+    #87ceeb 3px,
+    #87ceeb 6px,
+    #fffacd 6px,
+    #fffacd 9px
+  );
+  border: 2px solid #ff69b4;
+}
+
+.frame-preview-modern {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 </style>

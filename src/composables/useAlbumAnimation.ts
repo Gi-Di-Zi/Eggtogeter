@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, toRaw } from 'vue'
 import * as turf from '@turf/turf'
 import { calculateRoute } from '@/utils/routeCalculator'
 
@@ -10,6 +10,7 @@ export interface PhotoNode {
     description?: string
     storage_path?: string
     publicUrl?: string
+    address?: string // Added address
     transportMode?: 'walk' | 'car' | 'airplane' | 'bicycle' | 'bus' | 'subway' | 'ship' // Derived from transition
 }
 
@@ -22,7 +23,7 @@ export interface RouteSegment {
     startIndexInFullRoute: number
 }
 
-export type AnimationState = 'idle' | 'showing_start_date' | 'showing_new_date' | 'moving' | 'paused_for_photo'
+export type AnimationState = 'idle' | 'showing_start_date' | 'showing_new_date' | 'moving' | 'paused_for_photo' | 'dissolving'
 
 export function useAlbumAnimation() {
     // State
@@ -31,9 +32,11 @@ export function useAlbumAnimation() {
     const progress = ref(0) // 0.0 to 100.0
     const speedMultiplier = ref(1.0)
     const animationState = ref<AnimationState>('idle')
+    const isRouteReady = ref(false)
 
     // Derived State
     const isPausedForPhoto = computed(() => animationState.value === 'paused_for_photo')
+
 
     // Route Data
     const routeLine = ref<any>(null) // Full Turf LineString
@@ -50,21 +53,71 @@ export function useAlbumAnimation() {
     let animationFrameId: number | null = null
     let lastFrameTime = 0
 
+
     // Weights (km/h)
-    const SPEED_WALK = 10
-    const SPEED_BICYCLE = 25
-    const SPEED_CAR = 120
-    const SPEED_BUS = 80
-    const SPEED_SUBWAY = 150
-    const SPEED_SHIP = 40
+    const SPEED_WALK = 80 // Increased for snappier animation
+    const SPEED_BICYCLE = 120
+    const SPEED_CAR = 200
+    const SPEED_BUS = 180
+    const SPEED_SUBWAY = 250
+    const SPEED_SHIP = 150
     const SPEED_AIRPLANE = 800
     const SPEED_BASE = 100
+    const SPEED_INSTANT = 20000 // Very fast for 'none' mode (effectively instant)
+    const DATE_DISPLAY_DURATION_MS = 3000 // 3 seconds for date overlay
+    let dateDisplayTimer: ReturnType<typeof setTimeout> | null = null
+    // Watchdog State
+    const lastStateChangeTime = ref(0)
+    let watchdogInterval: ReturnType<typeof setInterval> | null = null
+
+    // Helper to update state safely
+    const setAnimationState = (newState: AnimationState) => {
+        animationState.value = newState
+        lastStateChangeTime.value = Date.now()
+    }
+
+    // Watchdog: Runs every 1s to check for stuck states
+    const startWatchdog = () => {
+        if (watchdogInterval) clearInterval(watchdogInterval)
+        watchdogInterval = setInterval(() => {
+            if (!isPlaying.value) return
+
+            const now = Date.now()
+            const elapsed = now - lastStateChangeTime.value
+
+            // Rule 1: Stuck in 'paused_for_photo' > 8s (Expected 5s + buffer)
+            if (animationState.value === 'paused_for_photo' && elapsed > 8000) {
+                console.warn('[Animation] Watchdog: Recovering from stuck paused_for_photo')
+                resumeMoving()
+            }
+
+            // Rule 2: Stuck in 'showing_new_date' > 5s (Expected 3s + buffer)
+            if (animationState.value === 'showing_new_date' && elapsed > 5000) {
+                console.warn('[Animation] Watchdog: Recovering from stuck showing_new_date')
+                resumeMoving()
+            }
+
+            // Rule 3: Stuck in 'showing_start_date' > 5s (Expected 3s + buffer)
+            if (animationState.value === 'showing_start_date' && elapsed > 5000) {
+                console.warn('[Animation] Watchdog: Recovering from stuck showing_start_date')
+                resumeMoving()
+            }
+
+        }, 1000)
+    }
 
     // --- Initialization ---
     const initializeRoute = async (rawPhotos: any[], transitions: any[]) => {
-        photos.value = rawPhotos
+        isRouteReady.value = false
+        // [Existing logic...]
+        photos.value = rawPhotos.map(p => ({
+            ...p,
+            latitude: Number(p.latitude),
+            longitude: Number(p.longitude),
+            address: p.address || '' // Ensure address is mapped
+        }))
         if (photos.value.length < 2) {
-            // Handle single photo or no photos case
+            // [Existing One Photo logic...]
             if (photos.value.length === 1) {
                 const p0 = photos.value[0]
                 if (p0) {
@@ -84,6 +137,7 @@ export function useAlbumAnimation() {
                 segments.value = []
                 photoArrivalPoints.value = []
             }
+            isRouteReady.value = true // Ensure ready is set
             return
         }
 
@@ -102,20 +156,30 @@ export function useAlbumAnimation() {
             // Determine Mode
             const trans = transitions.find((t: any) => t.from === from.id && t.to === to.id)
             const mode = trans?.mode || 'car'
+            // console.log(`[Animation] Segment ${i} Mode:`, mode) // Reduce Log spam
+
 
             let segmentGeo: number[][] = []
 
             if (mode === 'none') {
-                // Instant transition logic: straight line but will be skipped
+                // For 'none' mode, we still want the REAL route geometry for visual "dotted line"
+                // but we will skip the animation movement visibly.
+                try {
+                    const routeResult = await calculateRoute([
+                        { lat: from.latitude, lng: from.longitude },
+                        { lat: to.latitude, lng: to.longitude }
+                    ])
+                    if (routeResult && routeResult.type === 'LineString') {
+                        segmentGeo = routeResult.coordinates as number[][]
+                    } else {
+                        segmentGeo = [[from.longitude, from.latitude], [to.longitude, to.latitude]]
+                    }
+                } catch (e) {
+                    segmentGeo = [[from.longitude, from.latitude], [to.longitude, to.latitude]]
+                }
+            } else if (mode === 'airplane' || mode === 'ship') {
+                // FORCE STRAIGHT LINE (User Request)
                 segmentGeo = [[from.longitude, from.latitude], [to.longitude, to.latitude]]
-            } else if (mode === 'airplane') {
-                // Great Circle (Arc)
-                const line = turf.greatCircle(
-                    [from.longitude, from.latitude],
-                    [to.longitude, to.latitude],
-                    { npoints: 20 }
-                )
-                segmentGeo = line.geometry.coordinates as number[][]
             } else {
                 // Standard Route (OSRM/GraphHopper via util) or Straight Line fallback
                 try {
@@ -134,17 +198,25 @@ export function useAlbumAnimation() {
                 }
             }
 
-            // Stitching
-            if (coords.length > 0 && segmentGeo.length > 0) {
-                // Avoid duplicate point at joint
+
+            // Stitching: Avoid duplicate point at joint
+            // BUT only if we have enough points remaining after shift
+            if (coords.length > 0 && segmentGeo.length > 2) {
                 segmentGeo.shift()
             }
+
+            // Skip if segmentGeo is invalid (should not happen after above fix)
+            if (segmentGeo.length < 2) {
+                console.warn(`[Animation] Segment ${i} has insufficient coordinates, skipping`)
+                continue
+            }
+
 
             const startIdx = coords.length
             coords = coords.concat(segmentGeo)
 
             // Calc Segment Distance
-            const segLine = turf.lineString(segmentGeo.length > 0 ? segmentGeo : [[0, 0], [0, 0]])
+            const segLine = turf.lineString(segmentGeo)
             const segDist = turf.length(segLine, { units: 'kilometers' })
 
             segs.push({
@@ -161,8 +233,45 @@ export function useAlbumAnimation() {
             arrivalPoints.push(currentDist)
         }
 
-        fullCoordinates.value = coords
-        routeLine.value = turf.lineString(coords.length > 1 ? coords : [[0, 0], [1, 1]]) // Ensure valid LineString for turf.along
+        // Sanitize Coordinates: Filter invalid AND remove consecutive duplicates
+        const validCoords: number[][] = []
+        coords.forEach((c) => {
+            // Check validity
+            if (!Array.isArray(c) || c.length < 2 ||
+                typeof c[0] !== 'number' || isNaN(c[0]) ||
+                typeof c[1] !== 'number' || isNaN(c[1])) {
+                return
+            }
+
+            // Check duplicate with last added to avoid zero-length segments
+            // Simple equality check for lat/lng
+            if (validCoords.length > 0) {
+                const last = validCoords[validCoords.length - 1]
+                if (last && last[0] !== undefined && last[1] !== undefined &&
+                    Math.abs(last[0] - c[0]) < 0.000001 && Math.abs(last[1] - c[1]) < 0.000001) {
+                    return // Skip duplicate
+                }
+            }
+            validCoords.push(c)
+        })
+
+        fullCoordinates.value = validCoords
+
+        // Ensure valid LineString
+        if (validCoords.length > 1) {
+            routeLine.value = turf.lineString(validCoords)
+        } else if (validCoords.length === 1) {
+            // Handle case: Multiple photos but all at effectively same location
+            const p = validCoords[0]
+            if (p) {
+                routeLine.value = turf.lineString([p, [p[0] + 0.000001, p[1] + 0.000001]])
+            } else {
+                routeLine.value = null
+            }
+        } else {
+            // Fallback dummy line
+            routeLine.value = turf.lineString([[127.0, 37.5], [127.0001, 37.5001]])
+        }
         totalDistance.value = currentDist
         segments.value = segs
 
@@ -170,44 +279,50 @@ export function useAlbumAnimation() {
         if (currentDist > 0) {
             photoArrivalPoints.value = arrivalPoints.map(d => (d / currentDist) * 100)
         } else {
-            // If total distance is 0 (e.g., all photos at same spot), all arrival points are 0
+            // If total distance is 0
             photoArrivalPoints.value = photos.value.map(() => 0)
         }
 
         console.log('[Animation] Initialized. Total Dist:', totalDistance.value.toFixed(2), 'km', 'Transitions:', transitions.length)
+        isRouteReady.value = true
+        startWatchdog() // START WATCHDOG
     }
 
     // --- Animation Loop ---
     const loop = (timestamp: number) => {
-        if (!isPlaying.value) return
-
         if (animationState.value !== 'moving') {
-            // If not moving, just keep the loop alive but don't advance progress
-            lastFrameTime = timestamp
-            animationFrameId = requestAnimationFrame(loop)
-            return
+            return;
         }
 
         if (!lastFrameTime) lastFrameTime = timestamp
-        const delta = (timestamp - lastFrameTime) / 1000 // seconds
+        const deltaTime = timestamp - lastFrameTime // milliseconds
         lastFrameTime = timestamp
+
+        // Safety cap for delta time (e.g. if tab was backgrounded)
+        const safeDelta = Math.min(deltaTime, 100); // to 100ms
+
+        // Convert safeDelta to seconds for calculations
+        const deltaSeconds = safeDelta / 1000;
 
         // Calculate Speed based on current Mode
         let speedKmh = SPEED_BASE
-        if (currentTransportMode.value === 'walk') speedKmh = SPEED_WALK
+        // [Existing Speed Logic...]
+        if (currentTransportMode.value === 'none') speedKmh = SPEED_INSTANT * 2 // Make it visibly instant
+        else if (currentTransportMode.value === 'walk') speedKmh = SPEED_WALK
         else if (currentTransportMode.value === 'bicycle') speedKmh = SPEED_BICYCLE
         else if (currentTransportMode.value === 'car') speedKmh = SPEED_CAR
         else if (currentTransportMode.value === 'bus') speedKmh = SPEED_BUS
         else if (currentTransportMode.value === 'subway') speedKmh = SPEED_SUBWAY
         else if (currentTransportMode.value === 'ship') speedKmh = SPEED_SHIP
         else if (currentTransportMode.value === 'airplane') speedKmh = SPEED_AIRPLANE
-        else if (currentTransportMode.value === 'none') speedKmh = 999999 // Instant transition
+
+        // Apply Multiplier
+        speedKmh *= speedMultiplier.value
 
         // Virtual distance traveled in this frame
-        const distTraveledKm = (speedKmh * speedMultiplier.value * delta) / 3600
-
-        // Convert to % progress
+        const distTraveledKm = (speedKmh * deltaSeconds) / 3600
         let progressDelta = 0
+
         if (totalDistance.value > 0) {
             progressDelta = (distTraveledKm / totalDistance.value) * 100
         }
@@ -215,7 +330,6 @@ export function useAlbumAnimation() {
         let newProgress = progress.value + progressDelta
 
         // Check for Photo Arrival
-        // Find next photo point
         const nextPhotoIdx = currentPhotoIndex.value + 1
         if (nextPhotoIdx < photos.value.length) {
             const targetProgress = photoArrivalPoints.value[nextPhotoIdx] ?? 100
@@ -230,7 +344,7 @@ export function useAlbumAnimation() {
             if (newProgress >= 100) {
                 newProgress = 100
                 isPlaying.value = false
-                animationState.value = 'idle'
+                setAnimationState('idle') // Use helper
             }
         }
 
@@ -245,7 +359,7 @@ export function useAlbumAnimation() {
     const handlePhotoArrival = (photoIdx: number) => {
         console.log('[Animation] Arrived at photo', photoIdx + 1)
         // 1. Pause Moving
-        animationState.value = 'paused_for_photo'
+        setAnimationState('paused_for_photo') // Use helper
         currentPhotoIndex.value = photoIdx
 
         // 2. Wait 5 seconds (Photo display)
@@ -253,7 +367,6 @@ export function useAlbumAnimation() {
             if (!isPlaying.value) return // manual pause check
 
             // 3. Check Date Change
-            // We are currently AT photoIdx. We are about to move to photoIdx + 1.
             let nextIdx = photoIdx + 1
             if (nextIdx < photos.value.length) {
                 const photoAtIdx = photos.value[photoIdx]
@@ -263,12 +376,12 @@ export function useAlbumAnimation() {
                     const nextDate = new Date(photoAtNext.taken_at).toLocaleDateString()
 
                     if (thisDate !== nextDate) {
-                        animationState.value = 'showing_new_date'
+                        setAnimationState('showing_new_date') // Use helper
                         setTimeout(() => {
                             if (isPlaying.value) {
                                 resumeMoving()
                             }
-                        }, 3000) // 3 seconds new date
+                        }, DATE_DISPLAY_DURATION_MS)
                         return
                     }
                 }
@@ -279,14 +392,13 @@ export function useAlbumAnimation() {
     }
 
     const resumeMoving = () => {
-        animationState.value = 'moving'
-        lastFrameTime = 0 // Reset lastFrameTime to prevent large delta after pause
+        setAnimationState('moving') // Use helper
+        lastFrameTime = 0
         loop(performance.now())
     }
 
+    // [updateCurrentState is same...]
     const updateCurrentState = (prog: number) => {
-        // 1. Determine current segment & mode
-        // Find segment where current dist is between start and end
         const points = photoArrivalPoints.value
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i]
@@ -301,23 +413,34 @@ export function useAlbumAnimation() {
         }
     }
 
+
     // --- Controls ---
     const play = () => {
         if (isPlaying.value) return
         isPlaying.value = true
+        startWatchdog()
 
         if (progress.value >= 100) {
             progress.value = 0
             currentPhotoIndex.value = 0
-            animationState.value = 'idle'
+            setAnimationState('idle')
         }
 
         // Start Logic
         if (progress.value === 0 && currentPhotoIndex.value === 0) {
-            animationState.value = 'showing_start_date'
+            // New Sequence: Photo -> Date -> Move
+            setAnimationState('paused_for_photo')
+
             setTimeout(() => {
-                if (isPlaying.value) resumeMoving()
-            }, 3000) // 3 seconds for start date
+                if (!isPlaying.value) return
+
+                setAnimationState('showing_start_date')
+
+                setTimeout(() => {
+                    if (!isPlaying.value) return
+                    resumeMoving()
+                }, DATE_DISPLAY_DURATION_MS)
+            }, 3000) // 3 seconds for first photo
         } else {
             resumeMoving()
         }
@@ -325,20 +448,30 @@ export function useAlbumAnimation() {
 
     const pause = () => {
         isPlaying.value = false
-        animationState.value = 'idle'
-        if (animationFrameId) cancelAnimationFrame(animationFrameId)
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId)
+            animationFrameId = null
+        }
+        if (dateDisplayTimer) {
+            clearTimeout(dateDisplayTimer)
+            dateDisplayTimer = null
+        }
+        if (watchdogInterval) {
+            clearInterval(watchdogInterval)
+            watchdogInterval = null
+        }
     }
 
+    // [rest of seekTo, getCurrentPosition, jumpToPhoto same...]
     const seekTo = (prog: number) => {
         progress.value = Math.max(0, Math.min(prog, 100))
-        // Update index based on progress
         let newPhotoIndex = 0
         const points = photoArrivalPoints.value
         for (let i = 0; i < points.length; i++) {
             if (progress.value >= (points[i] ?? 0)) {
                 newPhotoIndex = i
             } else {
-                break // Points are sorted, so we can stop early
+                break
             }
         }
         currentPhotoIndex.value = newPhotoIndex
@@ -346,37 +479,66 @@ export function useAlbumAnimation() {
     }
 
     const getCurrentPosition = () => {
-        if (!routeLine.value || totalDistance.value === 0) {
-            // If no route or 0 distance, return the first photo's location if available
-            const firstPhoto = photos.value[0]
-            if (firstPhoto) {
-                return turf.point([firstPhoto.longitude, firstPhoto.latitude])
+        try {
+            if (!routeLine.value || totalDistance.value === 0) {
+                const firstPhoto = photos.value[0]
+                if (firstPhoto &&
+                    typeof firstPhoto.longitude === 'number' &&
+                    typeof firstPhoto.latitude === 'number') {
+                    return turf.point([firstPhoto.longitude, firstPhoto.latitude])
+                }
+                return null
             }
+
+            const rawRoute = toRaw(routeLine.value)
+            // Added check for non-empty coordinates
+            if (!rawRoute || !rawRoute.geometry ||
+                !rawRoute.geometry.coordinates ||
+                rawRoute.geometry.coordinates.length < 2) {
+                return null
+            }
+
+            const actualLength = turf.length(rawRoute, { units: 'kilometers' })
+            const dist = Math.max(0, Math.min((progress.value / 100) * actualLength, actualLength))
+
+            if (typeof dist !== 'number' || isNaN(dist)) {
+                return null
+            }
+
+            return turf.along(rawRoute, dist, { units: 'kilometers' })
+        } catch (e) {
+            console.error('[Animation] getCurrentPosition Error', e)
             return null
         }
-        const dist = (progress.value / 100) * totalDistance.value
-        return turf.along(routeLine.value, dist, { units: 'kilometers' })
+    }
+
+    const jumpToPhoto = (idx: number) => {
+        if (idx < 0 || idx >= photos.value.length) return
+        const targetP = photoArrivalPoints.value[idx] ?? 0
+        seekTo(targetP)
+        isPlaying.value = true
+        startWatchdog()
+        handlePhotoArrival(idx)
     }
 
     return {
-        // State
         photos,
         segments,
         isPlaying,
         animationState,
-        isPausedForPhoto, // Exposed
+        isRouteReady,
+        isPausedForPhoto,
         progress,
         speedMultiplier,
         currentPhotoIndex,
         currentTransportMode,
         routeLine,
         photoArrivalPoints,
-
-        // Methods
         initializeRoute,
         play,
         pause,
         seekTo,
-        getCurrentPosition
+        getCurrentPosition,
+        jumpToPhoto
     }
 }

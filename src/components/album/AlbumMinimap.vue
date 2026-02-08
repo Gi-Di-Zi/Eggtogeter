@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch, ref, onBeforeUnmount } from 'vue'
+import { onMounted, watch, ref, onBeforeUnmount, toRaw } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as turf from '@turf/turf'
@@ -34,25 +34,72 @@ onMounted(() => {
   })
 
   map.on('load', () => {
+    // 1. Add Route
     if (props.routeGeoJson) {
       addRouteLayer(props.routeGeoJson)
       fitBounds(props.routeGeoJson)
+      // Initial update for traveled path if position exists
+      if (props.currentPosition) {
+          updateTraveledLayer(props.currentPosition)
+      }
+    } else if (props.photos && props.photos.length > 0) {
+        fitBoundsToPhotos(props.photos)
     }
+
+    // 2. Add Dots
     if (props.photos && props.photos.length > 0) {
       addPhotoDotsLayer(props.photos)
     }
+    
+    // Fix: Force resize to prevent visibility issues on some browsers/containers
+    map?.resize()
   })
 })
 
+// Watchers
+// Watchers
+watch(() => props.routeGeoJson, (newVal) => {
+    if (!newVal) return
+
+    // Robustly handle map state
+    if (map && map.loaded()) {
+        addRouteLayer(newVal)
+        fitBounds(newVal)
+    } else if (map) {
+        // Map created but not loaded; verify logic
+        // We can rely on 'load' event, but if it already fired (state ambiguity),
+        // we can force consistency.
+        // However, standard pattern is to wait.
+        // Let's ensure we try to fit bounds if layer exists but bounds weird.
+        if (map.getSource('minimap-route')) {
+             addRouteLayer(newVal)
+             fitBounds(newVal)
+        }
+    }
+}, { immediate: true })
+
 const addRouteLayer = (geoJson: any) => {
     if (!map) return
+
+    // 1. Check for Dummy Route (0,0 to 1,1) - identical logic to fitBounds
+    try {
+        const bbox = turf.bbox(geoJson)
+        if (bbox[0] === 0 && bbox[1] === 0 && bbox[2] === 1 && bbox[3] === 1) {
+            console.warn('[Minimap] Dummy route detected, skipping addRouteLayer')
+            return
+        }
+    } catch(e) { /* ignore */ }
     
+    // 2. Resolve Proxy
+    const rawGeoJson = toRaw(geoJson)
+
+    // 1. Base Route (Yellow - full path)
     if (map.getSource('minimap-route')) {
-        (map.getSource('minimap-route') as maplibregl.GeoJSONSource).setData(geoJson)
+        (map.getSource('minimap-route') as maplibregl.GeoJSONSource).setData(rawGeoJson)
     } else {
         map.addSource('minimap-route', {
             type: 'geojson',
-            data: geoJson
+            data: rawGeoJson
         })
         map.addLayer({
             id: 'minimap-route-line',
@@ -63,10 +110,52 @@ const addRouteLayer = (geoJson: any) => {
                 'line-cap': 'round'
             },
             paint: {
-                'line-color': '#FFD700',
-                'line-width': 3
+                'line-color': '#FFD700', // Yellow
+                'line-width': 4,
+                'line-opacity': 0.5 // Dim base route slightly
             }
         })
+    }
+    
+    // 2. Traveled Route (Green - initially empty)
+    // We will update this in the currentPosition watcher
+    if (!map.getSource('minimap-route-traveled')) {
+        map.addSource('minimap-route-traveled', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+        })
+        map.addLayer({
+            id: 'minimap-route-traveled-line',
+            type: 'line',
+            source: 'minimap-route-traveled',
+            layout: {
+                'line-join': 'round',
+                'line-cap': 'round'
+            },
+            paint: {
+                'line-color': '#2ecc71', // Green
+                'line-width': 4
+            }
+        })
+    }
+}
+
+const updateTraveledLayer = (currentPos: any) => {
+    if (!map || !props.routeGeoJson || !currentPos) return
+    
+    try {
+        const rawRoute = toRaw(props.routeGeoJson)
+        // Ensure route is valid LineString
+        if (rawRoute.geometry.type !== 'LineString') return
+        
+        const startPoint = turf.point(rawRoute.geometry.coordinates[0])
+        const sliced = turf.lineSlice(startPoint, currentPos, rawRoute)
+        
+        if (map.getSource('minimap-route-traveled')) {
+            (map.getSource('minimap-route-traveled') as maplibregl.GeoJSONSource).setData(sliced)
+        }
+    } catch (e) {
+        // Silent fail for slice errors during init
     }
 }
 
@@ -102,21 +191,52 @@ const addPhotoDotsLayer = (photos: any[]) => {
 
 const fitBounds = (geoJson: any) => {
     if (!map || !geoJson) return
-    const bbox = turf.bbox(geoJson)
-    map.fitBounds(bbox as [number, number, number, number], { padding: 20 })
+    
+    // Check for "Dummy Route" (0,0 to 1,1)
+    try {
+        const bbox = turf.bbox(geoJson)
+        // [minX, minY, maxX, maxY]
+        // If it matches exactly [0, 0, 1, 1], treat as invalid/default
+        if (bbox[0] === 0 && bbox[1] === 0 && bbox[2] === 1 && bbox[3] === 1) {
+            console.warn('[Minimap] Default route detected, falling back to photos bounds')
+            if (props.photos && props.photos.length > 0) {
+                fitBoundsToPhotos(props.photos)
+            }
+            return
+        }
+        
+        map.fitBounds(bbox as [number, number, number, number], { padding: 20 })
+    } catch (e) {
+        console.error('[Minimap] FitBounds failed:', e)
+    }
+}
+
+const fitBoundsToPhotos = (photos: any[]) => {
+    if (!map || !photos || photos.length === 0) return
+    try {
+        const features = photos
+            .filter(p => p.longitude && p.latitude)
+            .map(p => turf.point([p.longitude, p.latitude]))
+        
+        if (features.length === 0) return
+
+        const collection = turf.featureCollection(features)
+        const bbox = turf.bbox(collection)
+        map.fitBounds(bbox as [number, number, number, number], { padding: 30 })
+    } catch (e) {
+        console.error('[Minimap] FitBoundsToPhotos failed:', e)
+    }
 }
 
 // Watchers
-watch(() => props.routeGeoJson, (newVal) => {
-    if (map && map.loaded()) {
-        addRouteLayer(newVal)
-        fitBounds(newVal)
-    }
-})
 
 watch(() => props.photos, (newVal) => {
-    if (map && map.loaded()) {
+    if (map && map.loaded() && newVal.length > 0) {
         addPhotoDotsLayer(newVal)
+        // If route is missing but photos exist, ensure we see something
+        if (!props.routeGeoJson) {
+             fitBoundsToPhotos(newVal)
+        }
     }
 })
 
@@ -135,11 +255,17 @@ watch(() => props.currentPosition, (newPos) => {
             el.style.borderRadius = '50%'
             el.style.border = '2px solid black'
             
+            // Fix: offset null to center the marker
             currentMarker = new maplibregl.Marker({ element: el })
                 .setLngLat(coords)
                 .addTo(map)
         } else {
             currentMarker.setLngLat(coords)
+        }
+        
+        // Update Traveled Path
+        if (map.loaded()) {
+            updateTraveledLayer(newPos)
         }
     }
 })

@@ -42,7 +42,7 @@ EggTogether는 **Supabase (PostgreSQL)** 를 기반으로 구축되었습니다.
 | `longitude` | `float8` | `Not Null` | 경도 |
 | `taken_at` | `timestamptz` | `Validation required` | 촬영 일시 (사용자 지정 가능) |
 | `address` | `text` | `Nullable` | 주소 (Kakao Map 역지오코딩 결과) |
-| `visibility` | `varchar` | `Check('friends', 'specific', 'private')` | 공유 범위 (기본: 'private') |
+| `visibility` | `varchar` | `Check('friends', 'specific', 'private')` | 공유 범위 (기본: **'private'**) |
 | `created_at` | `timestamptz` | `Default: now()` | 업로드 일시 |
 
 ### 2.3 `friends`
@@ -92,10 +92,10 @@ EggTogether는 **Supabase (PostgreSQL)** 를 기반으로 구축되었습니다.
 
 ### `photos`
 - **SELECT**:
-    1. 내 사진 (`auth.uid() = user_id`)
-    2. 친구 공개 (`visibility = 'friends'` AND 친구 관계 성립)
-    3. 특정 공개 (`visibility = 'specific'` AND `photo_shares`에 존재)
-- **INSERT/UPDATE/DELETE**: 작성자 본인만 가능.
+    1. **내 사진** (`auth.uid() = user_id`)
+    2. **친구 공개** (`visibility = 'friends'` AND 친구 관계 성립)
+    3. **특정 공개** (`visibility = 'specific'` AND `photo_shares`에 존재)
+- **ALL (Insert/Update/Delete)**: 작성자 본인만 가능 (`auth.uid() = user_id`)
 
 ### `friends`
 - 관련 당사자(`requester` 혹은 `recipient`)만 조회 및 상태 업데이트 가능.

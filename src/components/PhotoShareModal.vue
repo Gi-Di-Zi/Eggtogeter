@@ -42,7 +42,7 @@ watch(() => props.modelValue, async (val) => {
              shareScope.value = photo.visibility as any
         } else {
             // Default to private if unknown or public(legacy)
-            shareScope.value = 'friends' 
+            shareScope.value = 'private' 
         }
 
         // Load existing shares if specific
@@ -164,12 +164,19 @@ const handleSave = async () => {
                             filterable
                             style="flex: 1;"
                         >
-                            <el-option
-                                v-for="friend in availableFriends"
-                                :key="friend.id"
-                                :label="friend.email"
-                                :value="friend.id"
-                            />
+                            <template #default>
+                                <el-option
+                                    v-for="friend in availableFriends"
+                                    :key="friend.id"
+                                    :label="friend.nickname ? `${friend.nickname} (${friend.email})` : friend.email"
+                                    :value="friend.id"
+                                >
+                                    <div class="option-content">
+                                        <el-avatar :size="24" :src="friend.avatar_url" :icon="User" />
+                                        <span>{{ friend.nickname ? `${friend.nickname} (${friend.email})` : friend.email }}</span>
+                                    </div>
+                                </el-option>
+                            </template>
                         </el-select>
                         <el-button type="primary" :icon="Plus" @click="handleAddFriend" :disabled="!targetFriendId">
                             {{ $t('photo.share.btn_add') }}
@@ -183,8 +190,15 @@ const handleSave = async () => {
                         </div>
                         <div v-else class="friend-item" v-for="friend in addedFriends" :key="friend.id">
                             <div class="friend-info">
-                                <el-icon><User /></el-icon>
-                                <span class="friend-name">{{ (friend as any).isUnknown ? $t('photo.share.unknown_user') : friend.email }}</span>
+                                <el-avatar :size="32" :src="(friend as any).avatar_url" :icon="User" />
+                                <div class="friend-text">
+                                    <span class="friend-name">
+                                        {{ (friend as any).isUnknown ? $t('photo.share.unknown_user') : (friend.nickname || friend.email.split('@')[0]) }}
+                                    </span>
+                                    <span class="friend-email" v-if="!(friend as any).isUnknown" >
+                                        {{ (friend as any).isUnknown ? '' : friend.email }}
+                                    </span>
+                                </div>
                             </div>
                             <el-button 
                                 circle 
@@ -346,5 +360,23 @@ const handleSave = async () => {
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+.option-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.friend-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.2;
+}
+
+.friend-email {
+    font-size: 12px;
+    color: #909399;
 }
 </style>

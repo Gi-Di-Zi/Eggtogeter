@@ -42,23 +42,38 @@
 
     <!-- Right: Settings -->
     <div class="control-group right">
-      <el-button circle text @click="$emit('settings')">
-        <el-icon :size="20"><setting /></el-icon>
-      </el-button>
+      <el-popover
+        trigger="click"
+        placement="top-end"
+        :width="200"
+        popper-class="settings-popover"
+      >
+        <template #reference>
+            <el-button circle text>
+                <el-icon :size="20"><setting /></el-icon>
+            </el-button>
+        </template>
+        <div class="settings-menu">
+            <div class="menu-item" @click="$emit('open-map-settings')">
+                <el-icon><MapLocation /></el-icon>
+                <span>Map Style</span>
+            </div>
+        </div>
+      </el-popover>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { VideoPlay, VideoPause, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight, Setting } from '@element-plus/icons-vue'
+import { VideoPlay, VideoPause, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight, Setting, MapLocation } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   isPlaying: boolean
   speed: number
 }>()
 
-const emit = defineEmits(['toggle-play', 'prev', 'next', 'first', 'last', 'update:speed', 'settings'])
+const emit = defineEmits(['toggle-play', 'prev', 'next', 'first', 'last', 'update:speed', 'open-map-settings'])
 
 const internalSpeed = ref(props.speed)
 
@@ -161,4 +176,25 @@ const updateSpeed = (val: number) => {
 :deep(.el-slider__button) {
     border-color: #ffd700;
 }
+
+.settings-menu {
+    display: flex;
+    flex-direction: column;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+    color: #333;
+}
+
+.menu-item:hover {
+    background: #f5f7fa;
+}
+
 </style>

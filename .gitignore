@@ -17,6 +17,8 @@ docs
 !docs/Resources/DB_Schema.md
 !docs/Project_System_Overview.md
 .env
+.env.development
+.env.production
 .agent
 
 # Editor directories and files

@@ -5,19 +5,23 @@ import { Calendar, Location, Picture, Search, List, Grid, Files, ChatLineRound }
 import { useUiStore } from '@/stores/ui'
 import { useCategoryStore } from '@/stores/category'
 import { useAuthStore } from '@/stores/auth'
+import { useFriendStore } from '@/stores/friend'
 import { useI18n } from 'vue-i18n'
 
 const photoStore = usePhotoStore()
 const uiStore = useUiStore()
 const categoryStore = useCategoryStore()
 const authStore = useAuthStore()
+const friendStore = useFriendStore()
 const { t } = useI18n()
 
-onMounted(() => {
+onMounted(async () => {
     categoryStore.fetchCategories()
     if (authStore.user?.id) {
          // Home View: Show Shared Photos
          photoStore.fetchPhotos(authStore.user.id, true)
+         // Fetch friends for nickname lookup
+         await friendStore.fetchFriends()
     }
 })
 
@@ -29,6 +33,12 @@ const friendFilterOptions = computed(() => {
 
     photoStore.photos.forEach(photo => {
         if (photo.user_id !== myId && !friendMap.has(photo.user_id)) {
+            // Find friend info
+            const friend = friendStore.friends.find(f => f.id === photo.user_id)
+            const displayName = friend?.nickname 
+                ? `${friend.nickname}의 사진` 
+                : (friend?.email || t('home.friend_photos'))
+
             // Generate deterministic color (same logic as store)
             let hash = 0;
             for (let i = 0; i < photo.user_id.length; i++) {
@@ -39,7 +49,7 @@ const friendFilterOptions = computed(() => {
 
             friendMap.set(photo.user_id, {
                 id: `user:${photo.user_id}`,
-                name: t('home.friend_photos'), // Will be enhanced with nickname below
+                name: displayName,
                 color
             })
         }

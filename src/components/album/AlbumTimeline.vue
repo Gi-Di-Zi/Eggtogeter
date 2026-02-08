@@ -44,10 +44,10 @@
                   <el-icon v-if="item.mode === 'walk'"><User /></el-icon> 
                   <el-icon v-else-if="item.mode === 'bicycle'"><Bicycle /></el-icon> 
                   <el-icon v-else-if="item.mode === 'airplane'"><Promotion /></el-icon> 
-                  <el-icon v-else-if="item.mode === 'bus'"><Van /></el-icon> 
-                  <el-icon v-else-if="item.mode === 'subway'"><Location /></el-icon> 
+                  <BusIcon v-else-if="item.mode === 'bus'" />
+                  <SubwayIcon v-else-if="item.mode === 'subway'" />
                   <el-icon v-else-if="item.mode === 'ship'"><Ship /></el-icon> 
-                  <el-icon v-else-if="item.mode === 'car'"><Van /></el-icon>
+                  <CarIcon v-else-if="item.mode === 'car'" />
                   <el-icon v-else><Van /></el-icon>
                   <span class="dist-text">{{ item.distance.toFixed(1) }}km</span>
                 </div>
@@ -65,7 +65,70 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, type CSSProperties } from 'vue'
-import { CameraFilled, Bicycle, Van, Promotion, User, Ship, Location } from '@element-plus/icons-vue'
+import { CameraFilled, Bicycle, Van, Promotion, User, Ship } from '@element-plus/icons-vue'
+import { h } from 'vue'
+
+// Custom SVG Icons - Simplified & Larger
+const BusIcon = () => h('svg', {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '2.5',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  style: 'width: 22px; height: 22px; color: #ffd700;'
+}, [
+  // 버스 몸체 (단순 사각형)
+  h('rect', { x: '4', y: '6', width: '16', height: '10', rx: '2' }),
+  // 왼쪽 창문
+  h('rect', { x: '6', y: '8', width: '4', height: '3', rx: '0.5' }),
+  // 오른쪽 창문
+  h('rect', { x: '14', y: '8', width: '4', height: '3', rx: '0.5' }),
+  // 앞바퀴
+  h('circle', { cx: '8', cy: '18', r: '1.5' }),
+  // 뒷바퀴
+  h('circle', { cx: '16', cy: '18', r: '1.5' })
+])
+
+const CarIcon = () => h('svg', {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '2.5',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  style: 'width: 22px; height: 22px; color: #ffd700;'
+}, [
+  // 차체 (단순화된 측면 뷰)
+  h('path', { d: 'M7 16h10M5 12h14c1 0 2 1 2 2v2H3v-2c0-1 1-2 2-2z' }),
+  // 지붕 (더 넓은 곡선 - 승객 공간 확대)
+  h('path', { d: 'M8.5 12l1-4h7l1 4' }),
+  // 앞바퀴
+  h('circle', { cx: '8', cy: '18', r: '1.5' }),
+  // 뒷바퀴
+  h('circle', { cx: '16', cy: '18', r: '1.5' })
+])
+
+const SubwayIcon = () => h('svg', {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '2.5',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  style: 'width: 22px; height: 22px; color: #ffd700;'
+}, [
+  // 지하철 몸체 (더 높은 사각형)
+  h('rect', { x: '5', y: '5', width: '14', height: '12', rx: '2' }),
+  // 왼쪽 창문
+  h('circle', { cx: '9', cy: '10', r: '1.5' }),
+  // 오른쪽 창문
+  h('circle', { cx: '15', cy: '10', r: '1.5' }),
+  // 선로 연결부 (좌)
+  h('line', { x1: '9', y1: '17', x2: '7', y2: '19' }),
+  // 선로 연결부 (우)
+  h('line', { x1: '15', y1: '17', x2: '17', y2: '19' })
+])
 
 const props = defineProps<{
   photos: any[]
@@ -344,8 +407,14 @@ const onPhotoClick = (idx: number) => {
 }
 
 .segment-info :deep(.el-icon) {
-  font-size: 18px; /* Scaled up icon even more */
+  font-size: 18px;
   color: #ffd700;
+}
+
+/* Custom SVG icons inherit sizing from parent */
+.segment-info svg {
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .dist-text {

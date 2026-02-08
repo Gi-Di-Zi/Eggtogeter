@@ -203,30 +203,40 @@ export const useAlbumStore = defineStore('album', () => {
             console.log('[fetchAlbumPhotos] No photo_ids in album')
             return []
         }
-
         loading.value = true
         try {
-            console.log('[fetchAlbumPhotos] Fetching photos with IDs:', album.content_data.photo_ids)
+            // [New] Public Mode: use Secure RPC to bypass RLS
+            if (publicMode) {
+                const { data, error } = await supabase.rpc('get_public_album_photos', { p_album_id: albumId })
+
+                if (error) {
+                    console.error('Failed to fetch public photos via RPC', error)
+                    return []
+                }
+                return data || []
+            }
+
+            // Standard Mode (Private/Authenticated)
+            const album = await fetchAlbumById(albumId, false) // fetchAlbumById handles its own loading state
+            if (!album || !album.content_data.photo_ids || album.content_data.photo_ids.length === 0) {
+                return []
+            }
+
             const { data, error } = await supabase
                 .from('photos')
                 .select('*')
                 .in('id', album.content_data.photo_ids)
 
-            if (error) {
-                console.error('[fetchAlbumPhotos] Error:', error)
-                throw error
-            }
+            if (error) throw error
 
-            console.log('[fetchAlbumPhotos] Retrieved photos:', data?.length)
-
-            // 시간 순서대로 정렬 (앨범 생성 시 순서 유지)
+            // Sort by album order
             const sorted = album.content_data.photo_ids
-                .map((id: string) => data?.find((p: any) => p.id === id))
+                .map((id: string) => data.find((p: any) => p.id === id))
                 .filter((p: any) => !!p)
 
             return sorted
-        } catch (err) {
-            console.error('Error fetching album photos:', err)
+        } catch (e) {
+            console.error('Failed to fetch album photos', e)
             return []
         } finally {
             loading.value = false
