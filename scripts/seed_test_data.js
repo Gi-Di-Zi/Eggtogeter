@@ -9,8 +9,30 @@ if (!fs.existsSync(statusPath)) {
     process.exit(1);
 }
 
-// Strip BOM if present
-const statusContent = fs.readFileSync(statusPath, 'utf8').replace(/^\uFEFF/, '');
+function readJsonWithEncodingFallback(filePath) {
+    const buf = fs.readFileSync(filePath);
+    if (buf.length >= 2) {
+        const b0 = buf[0];
+        const b1 = buf[1];
+        // UTF-16 LE BOM
+        if (b0 === 0xff && b1 === 0xfe) {
+            return buf.toString('utf16le').replace(/^\uFEFF/, '');
+        }
+        // UTF-16 BE BOM
+        if (b0 === 0xfe && b1 === 0xff) {
+            // Convert BE -> LE bytes
+            const swapped = Buffer.allocUnsafe(buf.length - 2);
+            for (let i = 2, j = 0; i + 1 < buf.length; i += 2, j += 2) {
+                swapped[j] = buf[i + 1];
+                swapped[j + 1] = buf[i];
+            }
+            return swapped.toString('utf16le').replace(/^\uFEFF/, '');
+        }
+    }
+    return buf.toString('utf8').replace(/^\uFEFF/, '');
+}
+
+const statusContent = readJsonWithEncodingFallback(statusPath);
 let status;
 try {
     status = JSON.parse(statusContent);

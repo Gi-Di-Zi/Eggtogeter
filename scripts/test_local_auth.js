@@ -11,6 +11,22 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const TEST_EMAIL = `test_${Date.now()}@example.com`;
 const TEST_PASSWORD = 'password123';
 
+async function attemptLogin(label = '') {
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: TEST_EMAIL,
+        password: TEST_PASSWORD
+    });
+
+    if (loginError || !loginData?.session) {
+        console.error(`[Fail] Login failed${label ? ` (${label})` : ''}: ${loginError?.message || 'no session'}`);
+        process.exitCode = 1;
+        return false;
+    }
+
+    console.log(`[Success] Login successful! User ID: ${loginData.user.id}`);
+    return true;
+}
+
 async function runTest() {
     console.log(`[1] Signing up user: ${TEST_EMAIL}`);
     const { data, error } = await supabase.auth.signUp({
@@ -89,35 +105,20 @@ async function runTest() {
     try {
         const verifyRes = await fetch(confirmationUrl, { redirect: 'follow' });
         console.log(`[4.1] Request finished. Final URL: ${verifyRes.url}`);
-
-        // Try login
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-            email: TEST_EMAIL,
-            password: TEST_PASSWORD
-        });
-
-        if (loginError) {
-            console.error(`[Fail] Login failed: ${loginError.message}`);
-        } else {
-            console.log(`[Success] Login successful! User ID: ${loginData.user.id}`);
-        }
+        await attemptLogin();
 
     } catch (e) {
-        if (e.message.includes('ECONNREFUSED')) {
-            // Redirected to localhost:5174 which is likely down
-            console.log('[Warn] Connection Refused (likely redirection to localhost:3000). checking login...');
+        const message = e?.message || '';
+        const causeText = JSON.stringify(e?.cause || {});
+        const isConnectionRefused = message.includes('ECONNREFUSED') || causeText.includes('ECONNREFUSED');
 
-            const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-                email: TEST_EMAIL,
-                password: TEST_PASSWORD
-            });
-            if (!loginError && loginData.session) {
-                console.log(`[Success] Login successful! User ID: ${loginData.user.id}`);
-            } else {
-                console.error('[Fail] Login failed after redirect error:', loginError?.message);
-            }
+        if (isConnectionRefused) {
+            // Verification may already be completed before redirect target fails.
+            console.log('[Warn] Connection Refused (likely redirection to localhost:3000). checking login...');
+            await attemptLogin('after redirect error');
         } else {
             console.error('[Fail] Verification Exception:', e);
+            process.exitCode = 1;
         }
     }
 }
