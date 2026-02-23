@@ -1,4 +1,5 @@
 import { ref, computed, toRaw } from 'vue'
+import { supabase } from '@/lib/supabase'
 import * as turf from '@turf/turf'
 import { calculateRoute } from '@/utils/routeCalculator'
 
@@ -11,7 +12,7 @@ export interface PhotoNode {
     storage_path?: string
     publicUrl?: string
     address?: string // Added address
-    transportMode?: 'walk' | 'car' | 'airplane' | 'bicycle' | 'bus' | 'subway' | 'ship' // Derived from transition
+    transportMode?: 'walk' | 'car' | 'airplane' | 'bicycle' | 'bus' | 'subway' | 'ship' | 'boat' | 'ferry' // Derived from transition
 }
 
 export interface RouteSegment {
@@ -19,7 +20,7 @@ export interface RouteSegment {
     toIndex: number
     geometry: any // GeoJSON LineString
     distance: number // km
-    mode: 'walk' | 'car' | 'airplane' | 'bicycle' | 'bus' | 'subway' | 'ship' | 'none'
+    mode: 'walk' | 'car' | 'airplane' | 'bicycle' | 'bus' | 'subway' | 'ship' | 'boat' | 'ferry' | 'none'
     startIndexInFullRoute: number
 }
 
@@ -47,7 +48,7 @@ export function useAlbumAnimation() {
 
     // Status
     const currentPhotoIndex = ref(0)
-    const currentTransportMode = ref<'walk' | 'car' | 'airplane' | 'bicycle' | 'bus' | 'subway' | 'ship' | 'none'>('car')
+    const currentTransportMode = ref<'walk' | 'car' | 'airplane' | 'bicycle' | 'bus' | 'subway' | 'ship' | 'boat' | 'ferry' | 'none'>('car')
 
     // Internal Animation
     let animationFrameId: number | null = null
@@ -109,13 +110,29 @@ export function useAlbumAnimation() {
     // --- Initialization ---
     const initializeRoute = async (rawPhotos: any[], transitions: any[]) => {
         isRouteReady.value = false
-        // [Existing logic...]
-        photos.value = rawPhotos.map(p => ({
-            ...p,
-            latitude: Number(p.latitude),
-            longitude: Number(p.longitude),
-            address: p.address || '' // Ensure address is mapped
-        }))
+        if (!rawPhotos || rawPhotos.length === 0) {
+            isRouteReady.value = true
+            return
+        }
+
+        // [FIX] Ensure photos are sorted by TIME to match transition logic
+        const sortedPhotos = [...rawPhotos].sort((a, b) => new Date(a.taken_at).getTime() - new Date(b.taken_at).getTime())
+
+        // 0. Pre-process photos (get publicUrl)
+        photos.value = sortedPhotos.map(p => {
+            let url = p.publicUrl
+            if (!url && p.storage_path) {
+                const { data } = supabase.storage.from('photos').getPublicUrl(p.storage_path)
+                url = data.publicUrl
+            }
+            return {
+                ...p,
+                latitude: Number(p.latitude),
+                longitude: Number(p.longitude),
+                address: p.address || '', // Ensure address is mapped
+                publicUrl: url
+            }
+        })
         if (photos.value.length < 2) {
             // [Existing One Photo logic...]
             if (photos.value.length === 1) {
@@ -154,9 +171,24 @@ export function useAlbumAnimation() {
             if (!from || !to) continue; // Safety check for TS
 
             // Determine Mode
-            const trans = transitions.find((t: any) => t.from === from.id && t.to === to.id)
+            let trans = transitions.find((t: any) => t.from === from.id && t.to === to.id)
+
+            // [FIX] Fallback to positional index if strict ID match fails
+            if (!trans && transitions[i]) {
+                const legacy = transitions[i]
+                if (legacy.mode && legacy.mode !== 'car') {
+                    console.warn(`[Animation] ID mismatch for ${from.id}->${to.id}. Using positional fallback index ${i} (${legacy.mode}).`)
+                    trans = legacy
+                }
+            }
+
             const mode = trans?.mode || 'car'
-            // console.log(`[Animation] Segment ${i} Mode:`, mode) // Reduce Log spam
+
+            if (!trans) {
+                console.warn(`[Animation] Missing transition for ${from.id} -> ${to.id}. Defaulting to 'car'.`)
+            } else {
+                // console.log(`[Animation] Match: ${mode}`)
+            }
 
 
             let segmentGeo: number[][] = []
@@ -177,7 +209,7 @@ export function useAlbumAnimation() {
                 } catch (e) {
                     segmentGeo = [[from.longitude, from.latitude], [to.longitude, to.latitude]]
                 }
-            } else if (mode === 'airplane' || mode === 'ship') {
+            } else if (mode === 'airplane' || mode === 'ship' || mode === 'boat' || mode === 'ferry') {
                 // FORCE STRAIGHT LINE (User Request)
                 segmentGeo = [[from.longitude, from.latitude], [to.longitude, to.latitude]]
             } else {
@@ -263,7 +295,7 @@ export function useAlbumAnimation() {
         } else if (validCoords.length === 1) {
             // Handle case: Multiple photos but all at effectively same location
             const p = validCoords[0]
-            if (p) {
+            if (p && typeof p[0] === 'number' && typeof p[1] === 'number') {
                 routeLine.value = turf.lineString([p, [p[0] + 0.000001, p[1] + 0.000001]])
             } else {
                 routeLine.value = null
@@ -313,7 +345,7 @@ export function useAlbumAnimation() {
         else if (currentTransportMode.value === 'car') speedKmh = SPEED_CAR
         else if (currentTransportMode.value === 'bus') speedKmh = SPEED_BUS
         else if (currentTransportMode.value === 'subway') speedKmh = SPEED_SUBWAY
-        else if (currentTransportMode.value === 'ship') speedKmh = SPEED_SHIP
+        else if (currentTransportMode.value === 'ship' || currentTransportMode.value === 'boat' || currentTransportMode.value === 'ferry') speedKmh = SPEED_SHIP
         else if (currentTransportMode.value === 'airplane') speedKmh = SPEED_AIRPLANE
 
         // Apply Multiplier

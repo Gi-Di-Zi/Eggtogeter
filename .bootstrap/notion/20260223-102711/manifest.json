@@ -1,0 +1,134 @@
+{
+  "generated_at_utc": "2026-02-23 10:27:14Z",
+  "source_page_id": "31067a9b-e167-812c-84d6-f2bb3da01bb5",
+  "source_page_title": "Codex Settings Snapshot 2026-02-23 10:26:36Z",
+  "workspace_root": "C:\\personal-project\\eggtogether",
+  "global_codex_root": "C:\\Users\\DJ\\.codex",
+  "files": [
+    {
+      "original_path": "$HOME/.codex/AGENTS.md",
+      "bundle_path": "global_codex\\AGENTS.md",
+      "bytes": 1865
+    },
+    {
+      "original_path": "$HOME/.codex/config.toml",
+      "bundle_path": "global_codex\\config.toml",
+      "bytes": 334
+    },
+    {
+      "original_path": "$HOME/.codex/rules/default.rules",
+      "bundle_path": "global_codex\\rules\\default.rules",
+      "bytes": 3957
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/.agent/Project_Context.md",
+      "bundle_path": "workspace\\.agent\\Project_Context.md",
+      "bytes": 11194
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/.agent/skills/workflow-autowork/SKILL.md",
+      "bundle_path": "workspace\\.agent\\skills\\workflow-autowork\\SKILL.md",
+      "bytes": 6527
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/.agent/skills/workflow-bugfix/SKILL.md",
+      "bundle_path": "workspace\\.agent\\skills\\workflow-bugfix\\SKILL.md",
+      "bytes": 6096
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/.agent/skills/workflow-clean/SKILL.md",
+      "bundle_path": "workspace\\.agent\\skills\\workflow-clean\\SKILL.md",
+      "bytes": 3980
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/.agent/skills/workflow-database-migration/SKILL.md",
+      "bundle_path": "workspace\\.agent\\skills\\workflow-database-migration\\SKILL.md",
+      "bytes": 5118
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/.agent/skills/workflow-notion-sync/SKILL.md",
+      "bundle_path": "workspace\\.agent\\skills\\workflow-notion-sync\\SKILL.md",
+      "bytes": 3852
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/AGENTS.md",
+      "bundle_path": "workspace\\AGENTS.md",
+      "bytes": 5514
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/Progress/README.md",
+      "bundle_path": "workspace\\docs\\Progress\\README.md",
+      "bytes": 134
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/README.md",
+      "bundle_path": "workspace\\docs\\README.md",
+      "bytes": 1908
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/Resources/Backlog.md",
+      "bundle_path": "workspace\\docs\\Resources\\Backlog.md",
+      "bytes": 2009
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/Resources/Design/README.md",
+      "bundle_path": "workspace\\docs\\Resources\\Design\\README.md",
+      "bytes": 892
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/Resources/Flow/README.md",
+      "bundle_path": "workspace\\docs\\Resources\\Flow\\README.md",
+      "bytes": 837
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/Resources/Notion_Human_Guide.md",
+      "bundle_path": "workspace\\docs\\Resources\\Notion_Human_Guide.md",
+      "bytes": 4231
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/Resources/Notion_Sync_Runbook.md",
+      "bundle_path": "workspace\\docs\\Resources\\Notion_Sync_Runbook.md",
+      "bytes": 3536
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/Resources/PRD/README.md",
+      "bundle_path": "workspace\\docs\\Resources\\PRD\\README.md",
+      "bytes": 994
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/Resources/Rules_Skills_Summary.md",
+      "bundle_path": "workspace\\docs\\Resources\\Rules_Skills_Summary.md",
+      "bytes": 3743
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/docs/TestData/README.md",
+      "bundle_path": "workspace\\docs\\TestData\\README.md",
+      "bytes": 925
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/package.json",
+      "bundle_path": "workspace\\package.json",
+      "bytes": 1273
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/scripts/notion_bootstrap_apply.py",
+      "bundle_path": "workspace\\scripts\\notion_bootstrap_apply.py",
+      "bytes": 3647
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/scripts/notion_bootstrap_pull.py",
+      "bundle_path": "workspace\\scripts\\notion_bootstrap_pull.py",
+      "bytes": 12484
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/scripts/notion_sync_settings.py",
+      "bundle_path": "workspace\\scripts\\notion_sync_settings.py",
+      "bytes": 12412
+    },
+    {
+      "original_path": "C:/personal-project/eggtogether/scripts/notion_sync_watch.py",
+      "bundle_path": "workspace\\scripts\\notion_sync_watch.py",
+      "bytes": 5774
+    }
+  ]
+}

@@ -86,12 +86,32 @@ watch(shareScope, async (newVal) => {
     }
 })
 
+type AddedFriendView = {
+    id: string
+    email: string
+    nickname?: string
+    avatar_url?: string
+    isUnknown: boolean
+}
+
 // Computed for UI
-const addedFriends = computed(() => {
+const addedFriends = computed<AddedFriendView[]>(() => {
     return selectedFriendIds.value.map(id => {
-        const f = friendStore.friends.find(fr => fr.id === id)
-        // Fix: Don't use t() here. Return object with empty email or flag
-        return f || { id, email: '', isUnknown: true }
+        const friend = friendStore.friends.find(fr => fr.id === id)
+        if (friend) {
+            return {
+                ...friend,
+                isUnknown: false
+            }
+        }
+
+        return {
+            id,
+            email: '',
+            nickname: '',
+            avatar_url: '',
+            isUnknown: true
+        }
     })
 })
 
@@ -190,13 +210,13 @@ const handleSave = async () => {
                         </div>
                         <div v-else class="friend-item" v-for="friend in addedFriends" :key="friend.id">
                             <div class="friend-info">
-                                <el-avatar :size="32" :src="(friend as any).avatar_url" :icon="User" />
+                                <el-avatar :size="32" :src="friend.avatar_url" :icon="User" />
                                 <div class="friend-text">
                                     <span class="friend-name">
-                                        {{ (friend as any).isUnknown ? $t('photo.share.unknown_user') : (friend.nickname || friend.email.split('@')[0]) }}
+                                        {{ friend.isUnknown ? $t('photo.share.unknown_user') : (friend.nickname || friend.email.split('@')[0]) }}
                                     </span>
-                                    <span class="friend-email" v-if="!(friend as any).isUnknown" >
-                                        {{ (friend as any).isUnknown ? '' : friend.email }}
+                                    <span class="friend-email" v-if="!friend.isUnknown" >
+                                        {{ friend.email }}
                                     </span>
                                 </div>
                             </div>

@@ -1,0 +1,44 @@
+{
+  "name": "eggtogether",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "notion:sync": "python scripts/notion_sync_settings.py",
+    "notion:watch": "python scripts/notion_sync_watch.py",
+    "notion:bootstrap": "python scripts/notion_bootstrap_pull.py"
+  },
+  "dependencies": {
+    "@deck.gl/core": "^9.2.5",
+    "@deck.gl/layers": "^9.2.5",
+    "@deck.gl/mapbox": "^9.2.5",
+    "@element-plus/icons-vue": "^2.3.2",
+    "@iarna/toml": "^2.2.5",
+    "@supabase/supabase-js": "^2.95.3",
+    "@turf/turf": "^7.3.2",
+    "@types/pg": "^8.16.0",
+    "@types/three": "^0.182.0",
+    "element-plus": "^2.12.0",
+    "exifr": "^7.1.3",
+    "maplibre-gl": "^5.15.0",
+    "pg": "^8.18.0",
+    "pinia": "^3.0.4",
+    "three": "^0.182.0",
+    "vue": "^3.5.24",
+    "vue-i18n": "^9.14.5",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@types/google.maps": "^3.58.1",
+    "@types/node": "^24.10.1",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.8.1",
+    "supabase": "^2.75.3",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vue-tsc": "^3.1.4"
+  }
+}

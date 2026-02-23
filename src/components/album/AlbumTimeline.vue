@@ -3,61 +3,74 @@
     <div class="timeline-scroll-area">
       <div class="timeline-track" :class="{ 'is-zigzag': isZigzag }">
         <!-- Rows for Snaking Layout -->
-        <div 
-          v-for="(rowItems, rIdx) in timelineRows" 
-          :key="rIdx"
-          class="timeline-row"
-          :class="{ 'row-reverse': rIdx % 2 === 1 }"
-        >
+        <template v-for="(rowItems, rIdx) in timelineRows" :key="rIdx">
           <div 
-            v-for="item in rowItems" 
-            :key="item.type === 'photo' ? item.data.id : 'seg-'+item.fromIndex"
-            class="timeline-item"
-            :class="['type-' + item.type, { active: currentPhotoIndex === (item.type === 'photo' ? item.photoIndex : -1) }]"
-            :style="getItemStyle(item)"
-            @click="item.type === 'photo' ? onPhotoClick(item.photoIndex) : null"
+            class="timeline-row"
+            :class="{ 'row-reverse': rIdx % 2 === 1 }"
           >
-            <!-- Photo Node -->
-            <template v-if="item.type === 'photo'">
-              <div class="date-group-label" v-if="item.isNewDate">
-                {{ formatDate(item.data.taken_at) }}
-              </div>
-              
-              <div class="node-content">
-                <div class="node-marker" :class="{ 'has-image': !!item.data.publicUrl }">
-                   <img 
-                     v-if="item.data.publicUrl" 
-                     :src="item.data.publicUrl" 
-                     class="node-thumb" 
-                     alt="thumb"
-                   />
-                   <el-icon v-else><CameraFilled /></el-icon>
+            <div 
+              v-for="item in rowItems" 
+              :key="item.type === 'photo' ? item.data.id : 'seg-'+item.fromIndex"
+              class="timeline-item"
+              :class="['type-' + item.type, { active: currentPhotoIndex === (item.type === 'photo' ? item.photoIndex : -1) }]"
+              :style="getItemStyle(item)"
+              @click="item.type === 'photo' ? onPhotoClick(item.photoIndex) : null"
+            >
+              <!-- Photo Node -->
+              <template v-if="item.type === 'photo'">
+                <div class="date-group-label" v-if="item.isNewDate">
+                  {{ formatDate(item.data.taken_at) }}
                 </div>
-                <div class="time-label">{{ formatTime(item.data.taken_at) }}</div>
-              </div>
-            </template>
+                
+                <div class="node-content">
+                  <div class="node-marker" :class="{ 'has-image': !!item.data.publicUrl }">
+                     <img 
+                       v-if="item.data.publicUrl" 
+                       :src="item.data.publicUrl" 
+                       class="node-thumb" 
+                       alt="thumb"
+                     />
+                     <el-icon v-else><CameraFilled /></el-icon>
+                  </div>
+                  <div class="time-label">{{ formatTime(item.data.taken_at) }}</div>
+                </div>
+              </template>
 
-            <!-- Segment (Connector) -->
-            <template v-else-if="item.type === 'segment'">
-              <div class="segment-line">
-                <div class="segment-info">
-                  <el-icon v-if="item.mode === 'walk'"><User /></el-icon> 
-                  <el-icon v-else-if="item.mode === 'bicycle'"><Bicycle /></el-icon> 
-                  <el-icon v-else-if="item.mode === 'airplane'"><Promotion /></el-icon> 
-                  <BusIcon v-else-if="item.mode === 'bus'" />
-                  <SubwayIcon v-else-if="item.mode === 'subway'" />
-                  <el-icon v-else-if="item.mode === 'ship'"><Ship /></el-icon> 
-                  <CarIcon v-else-if="item.mode === 'car'" />
-                  <el-icon v-else><Van /></el-icon>
-                  <span class="dist-text">{{ item.distance.toFixed(1) }}km</span>
+              <!-- Segment (Connector) -->
+              <template v-else-if="item.type === 'segment'">
+                <div class="segment-line">
+                  <div class="segment-info">
+                    <el-icon v-if="item.mode === 'walk'"><User /></el-icon> 
+                    <el-icon v-else-if="item.mode === 'bicycle'"><Bicycle /></el-icon> 
+                    <el-icon v-else-if="item.mode === 'airplane'"><Promotion /></el-icon> 
+                    <BusIcon v-else-if="item.mode === 'bus'" />
+                    <SubwayIcon v-else-if="item.mode === 'subway'" />
+                    <el-icon v-else-if="['ship', 'boat', 'ferry'].includes(item.mode)"><Ship /></el-icon> 
+                    <CarIcon v-else-if="item.mode === 'car'" />
+                    <el-icon v-else><Van /></el-icon>
+                    <span class="dist-text">{{ item.distance.toFixed(1) }}km</span>
+                  </div>
                 </div>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
-
-          <!-- Row Connector (Vertical for snaking) -->
-          <div v-if="rIdx < timelineRows.length - 1" class="row-v-connector"></div>
-        </div>
+          
+          <!-- Row Connector (Vertical for snaking) - Now sibling of timeline-row -->
+          <div v-if="rIdx < timelineRows.length - 1" class="row-v-connector" :class="{ 'connector-reverse': rIdx % 2 === 1 }">
+            <!-- Display transport mode and distance if connector data exists -->
+            <div v-if="rowConnectors[rIdx]" class="connector-info">
+              <el-icon v-if="rowConnectors[rIdx].mode === 'walk'"><User /></el-icon> 
+              <el-icon v-else-if="rowConnectors[rIdx].mode === 'bicycle'"><Bicycle /></el-icon> 
+              <el-icon v-else-if="rowConnectors[rIdx].mode === 'airplane'"><Promotion /></el-icon> 
+              <BusIcon v-else-if="rowConnectors[rIdx].mode === 'bus'" />
+              <SubwayIcon v-else-if="rowConnectors[rIdx].mode === 'subway'" />
+              <el-icon v-else-if="['ship', 'boat', 'ferry'].includes(rowConnectors[rIdx].mode)"><Ship /></el-icon> 
+              <CarIcon v-else-if="rowConnectors[rIdx].mode === 'car'" />
+              <el-icon v-else><Van /></el-icon>
+              <span class="dist-text">{{ rowConnectors[rIdx].distance.toFixed(1) }}km</span>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -202,23 +215,87 @@ const timelineItems = computed(() => {
   return items
 })
 
-// Row-based snaking logic
+// Row-based snaking logic (Dynamic based on width)
 const timelineRows = computed(() => {
   const items = timelineItems.value
-  const row0: any[] = []
-  const row1: any[] = []
-  const row2: any[] = []
   
+  // Determine ideal rows (1, 2, or 3)
+  const totalPhotos = displayPhotos.value.length
+  let targetRows = 1
+  if (totalPhotos > 10) targetRows = 3
+  else if (totalPhotos > 5) targetRows = 2
+  
+  // Calculate items per row (rounded up to front-load)
+  const photosPerRow = Math.ceil(totalPhotos / targetRows)
+  
+  const rows: any[][] = []
+  let currentRow: any[] = []
+  let currentPhotoCount = 0
+
   for (const item of items) {
-    const photoIdx = item.type === 'photo' ? item.photoIndex : item.fromIndex
+    // Skip segment if it's the start of a new row (connector replaces it visually)
+    if (currentRow.length === 0 && item.type === 'segment' && rows.length > 0) {
+        continue; 
+    }
+
+    currentRow.push(item)
     
-    if (photoIdx < 5) row0.push(item)
-    else if (photoIdx < 11) row1.push(item)
-    else row2.push(item)
+    if (item.type === 'photo') {
+        currentPhotoCount++
+        if (currentPhotoCount >= photosPerRow) {
+            rows.push(currentRow)
+            currentRow = []
+            currentPhotoCount = 0
+        }
+    }
+  }
+  
+  if (currentRow.length > 0) {
+      rows.push(currentRow)
   }
 
-  // Filter out empty rows
-  return [row0, row1, row2].filter(r => r.length > 0)
+  return rows
+})
+
+// Extract connector data (the segment that connects rows)
+const rowConnectors = computed(() => {  const items = timelineItems.value
+  const rows = timelineRows.value
+  const connectors: any[] = []
+  
+  // Track which items are in rows
+  const itemsInRows = new Set()
+  for (const row of rows) {
+    for (const item of row) {
+      if (item.type === 'photo') {
+        itemsInRows.add(item.photoIndex)
+      }
+    }
+  }
+  
+  // Find segments between row transitions
+  let currentRowIdx = 0
+  let photosInCurrentRow = 0
+  const photosPerRow = rows[0] ? rows[0].filter((i: any) => i.type === 'photo').length : 0
+  
+  for (const item of items) {
+    if (item.type === 'photo') {
+      photosInCurrentRow++
+      
+      // Check if we've completed a row
+      if (photosInCurrentRow >= photosPerRow && currentRowIdx < rows.length - 1) {
+        photosInCurrentRow = 0
+        currentRowIdx++
+      }
+    } else if (item.type === 'segment') {
+      // If this segment is not displayed in any row, it's a connector
+      const nextItem = items[items.indexOf(item) + 1]
+      if (nextItem && nextItem.type === 'photo' && photosInCurrentRow === 0 && currentRowIdx > 0) {
+        connectors.push(item)
+      }
+    }
+  }
+  
+  return connectors
 })
 
 const isZigzag = computed(() => displayPhotos.value.length > 5)
@@ -256,21 +333,23 @@ const onPhotoClick = (idx: number) => {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
-  padding: 30px 20px 10px 20px; /* Increased top padding to show absolute dates */
+  padding: 10px 40px; /* Increased side padding for "C-shape" connectors */
   background: rgba(0,0,0,0.6);
   backdrop-filter: blur(10px);
   border-radius: 12px;
   color: white;
-  overflow: hidden; /* Prevent global scroll, but allow wrap */
+  overflow: hidden; /* Keep hidden to clip border-radius, but inner scroll area handles content */
   border: 1px solid rgba(255,255,255,0.1);
-  max-height: 340px; /* Limits to ~3 lines of zigzag items */
+  max-height: 600px; /* Increased to show all 3 rows + connectors */
 }
 
 .timeline-scroll-area {
     width: 100%;
-    max-height: 100%;
-    overflow-y: auto; /* Allow internal scroll only if it EXCEEDS 3 lines */
-    scrollbar-width: none; /* Hide scrollbar for clean look */
+    height: 100%;
+    overflow-y: auto; /* Internal scroll */
+    overflow-x: visible; /* Allow connectors to extend beyond */
+    padding: 20px 10px 0 10px; /* Extra internal padding */
+    scrollbar-width: none; 
 }
 .timeline-scroll-area::-webkit-scrollbar { display: none; }
 
@@ -278,7 +357,6 @@ const onPhotoClick = (idx: number) => {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 30px; /* Vertical gap between rows */
   width: 100%;
 }
 
@@ -294,21 +372,99 @@ const onPhotoClick = (idx: number) => {
   flex-direction: row-reverse;
 }
 
-/* Vertical Snake Connector */
-.row-v-connector {
-  position: absolute;
-  width: 2px;
-  height: 30px;
-  background: rgba(255,255,255,0.2);
-  bottom: -30px;
+/* Row Styling */
+/* Row Styling */
+.timeline-row {
+  display: flex;
+  width: 100%;
+  position: relative;
+  align-items: center;
+  justify-content: space-between; /* Ensure items hit the edges for connectors */
+  padding: 10px 0; /* Vertical spacing between rows */
 }
 
-.timeline-row:not(.row-reverse) .row-v-connector {
-  right: 30px; /* End of LTR row */
+/* ... existing code ... */
+
+/* Connectors for Snake Layout - Vertical lines with segment-info styling */
+.row-v-connector {
+  position: relative;
+  width: 100%; /* Full width to allow absolute positioning */
+  height: 100px; /* Increased for better line visibility */
+  margin: -40px auto 0; /* Move upward to avoid covering dates */
+  border: none;
+  z-index: 1;
+  pointer-events: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.timeline-row.row-reverse .row-v-connector {
-  left: 30px; /* End of RTL row */
+
+/* Vertical line through connector */
+.row-v-connector::before {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 50%;
+  background: rgba(255,255,255,0.2);
+  top: 30%;
+  transform: translateX(-50%);
+  z-index: 0;
 }
+
+/* Vertical line through connector */
+.row-v-connector:not(.connector-reverse)::before {
+  right: 30px; /* Fixed pixel instead of 3% for consistent positioning */
+}
+
+.row-v-connector.connector-reverse::before {
+  left: 30px; /* Fixed pixel instead of 3% for consistent positioning */
+}
+
+/* LTR connectors (right side) - Info on left side of line */
+.row-v-connector:not(.connector-reverse) {
+  margin-right: 0;
+}
+
+.row-v-connector:not(.connector-reverse) .connector-info {
+  position: absolute;
+  right: 0; /* Left of the line */
+}
+
+/* RTL connectors (left side) - Info on right side of line */
+.row-v-connector.connector-reverse {
+  margin-left: 0;
+}
+
+.row-v-connector.connector-reverse .connector-info {
+  position: absolute;
+  left: 0; /* Right of the line */
+}
+
+/* Transport mode info - EXACT copy of segment-info styling */
+.connector-info {
+  position: relative;
+  z-index: 1;
+  background: #000;
+  margin-top: 10px;
+  padding: 5px 14px; /* Same as segment-info */
+  border-radius: 16px; /* Same as segment-info */
+  font-size: 13px; /* Same as segment-info */
+  display: flex;
+  gap: 8px; /* Same as segment-info */
+  align-items: center;
+  color: #aaa; /* Same as segment-info */
+  border: 1px solid rgba(255,255,255,0.2); /* Same as segment-info */
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5); /* Same as segment-info */
+}
+
+.connector-info .el-icon {
+  font-size: 18px; /* Same as segment-info */
+  color: #ffd700; /* Same as segment-info */
+}
+
+
 
 .timeline-item {
   position: relative;
@@ -394,7 +550,7 @@ const onPhotoClick = (idx: number) => {
 
 .segment-info {
   background: #000;
-  padding: 6px 14px; /* Even more padding */
+  padding: 5px 14px; /* Even more padding */
   border-radius: 16px;
   font-size: 13px; /* Larger font-size */
   display: flex;

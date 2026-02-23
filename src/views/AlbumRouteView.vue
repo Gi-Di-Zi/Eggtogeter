@@ -109,7 +109,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAlbumStore } from '@/stores/album'
 import { useAlbumAnimation } from '@/composables/useAlbumAnimation'
-import { supabase } from '@/lib/supabase'
+
 
 // Components
 import AlbumControlDeck from '@/components/album/AlbumControlDeck.vue'
@@ -126,10 +126,6 @@ const albumStore = useAlbumStore()
 const albumId = ref<string | null>(null) // Reactive albumId
 
 // Computed
-const album = computed(() => {
-  if (!albumId.value) return null
-  return albumStore.currentAlbum
-})
 
 const isMapReady = ref(false)
 
@@ -249,9 +245,7 @@ const currentDateText = computed(() => {
     return new Date(currentPhoto.value.taken_at).toLocaleDateString()
 })
 
-const routeData = computed(() => {
-    return routeLine.value
-})
+
 
 const albumDateRange = computed(() => {
     const list = photos.value

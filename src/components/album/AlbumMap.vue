@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import * as THREE from 'three'
+// import * as THREE from 'three'
 import * as turf from '@turf/turf'
 import { FullScreen } from '@element-plus/icons-vue'
 
@@ -23,6 +23,7 @@ const mapContainer = ref<HTMLElement | null>(null)
 let map: maplibregl.Map | null = null
 
 // Three.js State
+/*
 let camera: THREE.Camera
 let scene: THREE.Scene
 let renderer: THREE.WebGLRenderer
@@ -35,8 +36,11 @@ const models = {
     bicycle: null as THREE.Group | null,
     bus: null as THREE.Group | null,
     subway: null as THREE.Group | null,
-    ship: null as THREE.Group | null
+    ship: null as THREE.Group | null,
+    boat: null as THREE.Group | null,
+    ferry: null as THREE.Group | null
 }
+*/
 
 // Fallback 2D Marker
 let vehicleMarker: maplibregl.Marker | null = null
@@ -132,55 +136,59 @@ function addPhotoMarkers() {
     })
 }
 
-function getTransportIcon(mode: string): string {
+/*
+function _getTransportIcon(_mode: string): string {
     return '' // Handled by CSS
 }
+*/
 
 
-function addRouteLayer() {
-    if (!map) return
+// function addRouteLayer() {
+//     if (!map) return
     
-    // Add Sources
-    if (!map.getSource('route')) {
-        map.addSource('route', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: [] }
-        })
-    }
+//     // Add Sources
+//     if (!map.getSource('route')) {
+//         map.addSource('route', {
+//             type: 'geojson',
+//             data: { type: 'FeatureCollection', features: [] }
+//         })
+//     }
+//     if (!map.getSource('history-route')) {
+//         map.addSource('history-route', {
+//             type: 'geojson',
+//             data: { type: 'FeatureCollection', features: [] }
+//         })
+//     }
+// }
+    
+    // Remove old segment layers if they exist
+
+const addRouteLayer = () => {
+    if (!map) return
+
+    // Ensure history source exists
     if (!map.getSource('history-route')) {
         map.addSource('history-route', {
             type: 'geojson',
             data: { type: 'FeatureCollection', features: [] }
         })
     }
-    
-    // Remove old segment layers if they exist
-    const existingLayers = map.getStyle()?.layers || []
-    existingLayers.forEach((layer: any) => {
-        if (layer.id.startsWith('segment-')) {
-            map!.removeLayer(layer.id)
-        }
-    })
-    
-    // Remove old segment sources
-    const existingSources = map.getStyle()?.sources || {}
-    Object.keys(existingSources).forEach((sourceId: string) => {
-        if (sourceId.startsWith('segment-')) {
-            map!.removeSource(sourceId)
-        }
-    })
-    
+
     // Add segment layers if segments are available
     if (props.segments && props.segments.length > 0) {
-        // [FIX] Remove global solid route line so it doesn't overlap/hide dashed segments
+        // [FIX] Remove global solid route line first
         if (map.getLayer('route-line')) map.removeLayer('route-line')
+        if (map.getSource('route')) map.removeSource('route')
 
         props.segments.forEach((segment: any, index: number) => {
             const sourceId = `segment-${index}`
             const layerId = `segment-layer-${index}`
             
-            // Add source for this segment
-            if (!map!.getSource(sourceId)) {
+            // Update exist source or create new
+            const source = map!.getSource(sourceId) as maplibregl.GeoJSONSource
+            if (source) {
+                source.setData(segment.geometry)
+            } else {
                 map!.addSource(sourceId, {
                     type: 'geojson',
                     data: segment.geometry
@@ -189,11 +197,10 @@ function addRouteLayer() {
             
             // Determine line style based on mode
             const isNoneMode = segment.mode === 'none'
-            // [FIX] Increase dash spacing for better visibility
             const lineDasharray = isNoneMode ? [0.1, 4] : undefined 
             const lineOpacity = isNoneMode ? 0.6 : 0.8
             
-            // Add layer for this segment
+            // Add layer for this segment (only if missing)
             if (!map!.getLayer(layerId)) {
                 map!.addLayer({
                     id: layerId,
@@ -213,7 +220,18 @@ function addRouteLayer() {
             }
         })
     } else {
-        // Fallback: single route line if no segments
+        // Fallback: single route line
+        // ... (Keep existing verify logic or simplify)
+        const source = map.getSource('route') as maplibregl.GeoJSONSource
+        if (source && props.routeLine) {
+            source.setData(props.routeLine)
+        } else if (props.routeLine) {
+             map.addSource('route', {
+                 type: 'geojson',
+                 data: props.routeLine
+             })
+        }
+
         if (!map.getLayer('route-line')) {
             map.addLayer({
                 id: 'route-line',
@@ -239,20 +257,17 @@ function addRouteLayer() {
 
 // Watch for segment changes to ensure route layer is added (especially for 'none' mode dashed lines)
 watch(() => props.segments, (newSegments) => {
+    // console.log('[AlbumMap] Segments changed:', newSegments?.length) 
     if (map && newSegments && newSegments.length > 0) {
-        // Debounce slightly to ensure map style is ready or just re-add
-        if (map.getLayer('route-layer')) {
-             map.removeLayer('route-layer')
-        }
-        if (map.getSource('route-source')) {
-             map.removeSource('route-source')
-        }
+        // [FIX] Do NOT clear layers here. addRouteLayer now handles updates smartly via setData.
+        // clearRouteLayers() 
         addRouteLayer()
     }
 }, { deep: true })
 
 // Custom 3D Layer implementation (Standard MapLibre + ThreeJS Pattern)
-function add3DLayer() {
+/*
+function _add3DLayer() {
     if (!map) return
 
     const customLayer: maplibregl.CustomLayerInterface = {
@@ -302,7 +317,7 @@ function add3DLayer() {
             renderer.autoClear = false
             renderer.shadowMap.enabled = true
         },
-        render: function (gl: WebGLRenderingContext, matrix: any) {
+        render: function (_gl: WebGLRenderingContext, matrix: any) {
             // console.log('3D Render Loop') // Verbose but useful
             if (!scene || !camera || !renderer) return
             
@@ -321,7 +336,9 @@ function add3DLayer() {
     if (map.getLayer('3d-models')) map.removeLayer('3d-models')
     map.addLayer(customLayer)
 }
+*/
 
+/*
 function createFallbackModels() {
     // Shared material for visibility
     const matOptions = { depthTest: true, depthWrite: true } // Enable depth? MapLibre handles it.
@@ -358,7 +375,10 @@ function createFallbackModels() {
     models.bus = makeGroup(new THREE.Mesh(new THREE.BoxGeometry(12,12,30), new THREE.MeshBasicMaterial({ color: 0xffa502 })))
     models.subway = makeGroup(new THREE.Mesh(new THREE.BoxGeometry(12,12,40), new THREE.MeshBasicMaterial({ color: 0xa4b0be })))
     models.ship = makeGroup(new THREE.Mesh(new THREE.BoxGeometry(20,10,60), new THREE.MeshBasicMaterial({ color: 0x3742fa })))
+    models.boat = models.ship.clone()
+    models.ferry = models.ship.clone()
 }
+*/
 
 function updateVehiclePosition(pos: any) {
     // console.log('[AlbumMap] updateVehiclePosition called', pos)
@@ -383,6 +403,7 @@ function updateVehiclePosition(pos: any) {
     if (isNaN(bearing)) bearing = 0
 
     // --- 3D UPDATE ---
+    /*
     if (vehicleGroup && map) {
         // Calculate Mercator Coordinate
         const altitude = props.currentTransportMode === 'airplane' ? 500 : 0
@@ -433,6 +454,7 @@ function updateVehiclePosition(pos: any) {
             // Check Pitch?
         }
     }
+    */
 
     // --- 2D DOM MARKER UPDATE ---
     if (!vehicleMarker) {
@@ -493,8 +515,28 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+    clearRouteLayers()
     if (map) map.remove()
 })
+
+const clearRouteLayers = () => {
+    if (!map) return
+    
+    // Remove fallback
+    if (map.getLayer('route-layer')) map.removeLayer('route-layer')
+    if (map.getSource('route-source')) map.removeSource('route-source')
+    
+    // Remove segments (Iterate safely up to a reasonable limit or track IDs)
+    // Since we don't track IDs, we iterate broadly or assume index based.
+    // Better to iterate existing style layers but that's complex.
+    // Simple loop 0..50
+    for (let i = 0; i < 50; i++) {
+        if (map.getLayer(`segment-layer-${i}`)) map.removeLayer(`segment-layer-${i}`)
+        if (map.getSource(`segment-${i}`)) map.removeSource(`segment-${i}`)
+    }
+}
+
+
 
 const initMap = () => {
     if (!mapContainer.value) return
@@ -598,14 +640,16 @@ watch(() => props.currentPosition, (pos) => {
     updateVehiclePosition(pos)
 }, { immediate: true })
 
-watch(() => props.currentTransportMode, (mode) => {
+watch(() => props.currentTransportMode, (_mode) => {
     // 3D Update
+    /*
     if (vehicleGroup) {
         vehicleGroup.clear()
         if (mode !== 'none' && models[mode as keyof typeof models]) {
             vehicleGroup.add(models[mode as keyof typeof models]!.clone())
         }
     }
+    */
     
     // 2D Update
     if (vehicleMarker) {
