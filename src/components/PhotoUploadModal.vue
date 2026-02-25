@@ -8,6 +8,7 @@ import exifr from 'exifr'
 import { Plus, Calendar, Edit, Location, MapLocation } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import PhotoLocationPicker from '@/components/PhotoLocationPicker.vue'
+import { isPlusCodeAddress, pickBestFormattedAddress, sanitizeAddress } from '@/utils/addressUtils'
 
 const { t } = useI18n()
 
@@ -157,8 +158,9 @@ const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> 
         }
         const geocoder = new google.maps.Geocoder()
         geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
-            if (status === 'OK' && results && results[0]) {
-                resolve(results[0].formatted_address)
+            if (status === 'OK' && results && results.length > 0) {
+                const best = pickBestFormattedAddress(results)
+                resolve(best && !isPlusCodeAddress(best) ? best : null)
             } else {
                 resolve(null)
             }
@@ -174,8 +176,12 @@ const openLocationHelper = () => {
 const handleLocationConfirm = (payload: { lat: number, lng: number, address: string }) => {
     latitude.value = payload.lat
     longitude.value = payload.lng
-    address.value = payload.address
+    address.value = sanitizeAddress(payload.address) || ''
     showLocationHelper.value = false
+}
+
+const getDisplayAddress = (value?: string | null) => {
+    return sanitizeAddress(value) || t('upload.loading_address')
 }
 
 const registerPhoto = async () => {
@@ -321,7 +327,7 @@ const registerPhoto = async () => {
             <div class="form-item">
                 <label><el-icon><MapLocation /></el-icon> {{ $t('upload.label_location') }}</label>
                 <div v-if="latitude && longitude" class="location-info">
-                    <p class="address">{{ address || $t('upload.loading_address') }}</p>
+                    <p class="address">{{ getDisplayAddress(address) }}</p>
                     <div class="location-btns">
                         <el-button size="small" type="primary" plain @click="openLocationHelper">{{ $t('upload.edit_location') }}</el-button>
                     </div>

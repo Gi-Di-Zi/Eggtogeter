@@ -9,6 +9,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { VideoCamera, Timer, Memo, Picture, Close, Ship, User, Right, Promotion, Bicycle } from '@element-plus/icons-vue'
 import { useGoogleMapsLoader } from '@/composables/useGoogleMapsLoader'
 import { calculateRoute } from '@/utils/routeCalculator'
+import { isPlusCodeAddress, pickBestFormattedAddress } from '@/utils/addressUtils'
 import { h } from 'vue'
 
 // Custom SVG Icons - Simplified & Larger (공유 디자인)
@@ -183,6 +184,24 @@ const timelineItems = computed(() => {
   })
 })
 
+const getShortAddress = (address?: string | null) => {
+  const raw = (address || '').trim()
+  if (!raw || isPlusCodeAddress(raw)) return t('album.create.step_photos.no_location')
+  return raw.split(' ').slice(0, 2).join(' ')
+}
+
+const getReadableAddress = (address?: string | null) => {
+  const raw = (address || '').trim()
+  if (!raw || isPlusCodeAddress(raw)) return t('album.create.step_confirm.no_address')
+  return raw
+}
+
+const getRoutePointAddress = (address: string | null | undefined, fallbackKey: string) => {
+  const raw = (address || '').trim()
+  if (!raw || isPlusCodeAddress(raw)) return t(fallbackKey)
+  return raw
+}
+
 // Duration and Location Summary
 const travelDuration = computed(() => {
   if (sortedPhotos.value.length < 2) return null
@@ -212,8 +231,8 @@ const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> 
     }
     const geocoder = new google.maps.Geocoder()
     geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
-      if (status === 'OK' && results && results[0]) {
-        resolve(results[0].formatted_address)
+      if (status === 'OK' && results && results.length > 0) {
+        resolve(pickBestFormattedAddress(results))
       } else {
         resolve(null)
       }
@@ -229,9 +248,12 @@ watch(filteredPhotos, async (photos) => {
         // Recover addresses for ANY visible photo if missing
         // Using a throttled approach or just batching could be safer but for now parallel is fine given low photo counts
         const recoveryPromises = photos.map(async (photo) => {
-          if (!photo.address?.trim() && photo.latitude && photo.longitude) {
+          const currentAddress = photo.address?.trim() || ''
+          const needsRecovery = !currentAddress || isPlusCodeAddress(currentAddress)
+
+          if (needsRecovery && photo.latitude && photo.longitude) {
             const recovered = await getAddressFromCoords(photo.latitude, photo.longitude)
-            if (recovered) {
+            if (recovered && !isPlusCodeAddress(recovered)) {
               photo.address = recovered
             }
           }
@@ -249,17 +271,8 @@ watch(sortedPhotos, async (photos) => {
     const first = photos[0]
     const last = photos[photos.length - 1]
     
-    if (first?.address) {
-      startAddr.value = first.address
-    } else {
-      startAddr.value = t('album.create.step_confirm.start_point')
-    }
-
-    if (last?.address) {
-      endAddr.value = last.address
-    } else {
-      endAddr.value = t('album.create.step_confirm.end_point')
-    }
+    startAddr.value = getRoutePointAddress(first?.address, 'album.create.step_confirm.start_point')
+    endAddr.value = getRoutePointAddress(last?.address, 'album.create.step_confirm.end_point')
 
     // Initialize Transitions
     const newTransitions = []
@@ -649,7 +662,7 @@ const handleCreate = async () => {
                 </el-icon>
               </div>
               <div class="photo-overlay-info">
-                <span>{{ photo.address?.split(' ').slice(0, 2).join(' ') || $t('album.create.step_photos.no_location') }}</span>
+                <span>{{ getShortAddress(photo.address) }}</span>
               </div>
             </div>
           </div>
@@ -733,7 +746,7 @@ const handleCreate = async () => {
                     <h5 class="timeline-photo-title">{{ item.photo.title || $t('album.create.step_confirm.no_title') }}</h5>
                     <div class="timeline-addr">
                       <el-icon><Location /></el-icon>
-                      {{ item.photo.address?.trim() || $t('album.create.step_confirm.no_address') }}
+                      {{ getReadableAddress(item.photo.address) }}
                     </div>
                   </div>
                 </div>

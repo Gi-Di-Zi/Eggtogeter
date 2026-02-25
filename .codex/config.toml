@@ -1,0 +1,14 @@
+# Repository-local Codex config (WSL + Multi-agent)
+
+[features]
+multi_agent = true
+
+[roles]
+default = ".codex/agents/default.toml"
+explorer = ".codex/agents/explorer.toml"
+reviewer = ".codex/agents/reviewer.toml"
+scribe = ".codex/agents/scribe.toml"
+executor_wsl = ".codex/agents/executor-wsl.toml"
+
+[policy]
+single_writer_role = "default"

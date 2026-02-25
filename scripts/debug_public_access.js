@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+﻿import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 
 function readJsonWithEncodingFallback(filePath) {
@@ -24,6 +24,13 @@ function readJsonWithEncodingFallback(filePath) {
 const status = readJsonWithEncodingFallback('status.json')
 const SUPABASE_URL = status.API_URL
 const SUPABASE_ANON_KEY = status.ANON_KEY
+
+const isMissingRpcError = (error) => {
+    const code = typeof error?.code === 'string' ? error.code : ''
+    const message = typeof error?.message === 'string' ? error.message.toLowerCase() : ''
+    return code === 'PGRST202' || message.includes('get_public_album_photos')
+}
+
 async function resolvePublicAlbumId(supabase) {
     if (process.env.PUBLIC_ALBUM_ID) return process.env.PUBLIC_ALBUM_ID
 
@@ -54,7 +61,7 @@ async function debug() {
 
     console.log('[Debug] Testing Public Access with ID:', albumId)
 
-    console.log('[1/2] Fetching Album...')
+    console.log('[1/3] Fetching Album...')
     const { data: album, error: albumError } = await supabase
         .from('albums')
         .select('*')
@@ -69,26 +76,57 @@ async function debug() {
     }
     console.log('[Pass] Album Fetched:', album.title)
 
-    if (!album.content_data?.photo_ids?.length) {
+    const expectedCount = Array.isArray(album.content_data?.photo_ids)
+        ? album.content_data.photo_ids.length
+        : 0
+
+    if (expectedCount === 0) {
         console.warn('[Warn] No photo IDs in album content_data')
         return
     }
 
-    console.log('[2/2] Fetching Photos...')
+    console.log('[2/3] Fetching photos via RPC get_public_album_photos...')
+    const { data: rpcPhotos, error: rpcError } = await supabase
+        .rpc('get_public_album_photos', { p_album_id: albumId })
+
+    if (!rpcError) {
+        if (!Array.isArray(rpcPhotos) || rpcPhotos.length === 0) {
+            console.error('[Fail] RPC returned empty. Expected:', expectedCount)
+            process.exitCode = 1
+            return
+        }
+
+        console.log('[Pass] RPC photos fetched:', rpcPhotos.length)
+        return
+    }
+
+    if (!isMissingRpcError(rpcError)) {
+        console.error('[Fail] RPC fetch failed:', rpcError)
+        process.exitCode = 1
+        return
+    }
+
+    console.warn('[Warn] RPC function not available. Falling back to direct photos query.')
+
+    console.log('[3/3] Fetching photos directly (RLS-dependent)...')
     const { data: photos, error: photosError } = await supabase
         .from('photos')
         .select('id,user_id,visibility')
         .in('id', album.content_data.photo_ids)
 
     if (photosError) {
-        console.error('[Fail] Photos Fetch Error:', photosError)
+        console.error('[Fail] Photos fetch error:', photosError)
         process.exitCode = 1
-    } else if (!photos || photos.length === 0) {
-        console.error('[Fail] Photos Fetch Empty. Expected:', album.content_data.photo_ids.length)
-        process.exitCode = 1
-    } else {
-        console.log('[Pass] Photos Fetched:', photos.length)
+        return
     }
+
+    if (!photos || photos.length === 0) {
+        console.error('[Fail] Photos fetch empty in fallback mode. Expected:', expectedCount)
+        process.exitCode = 1
+        return
+    }
+
+    console.log('[Pass] Photos fetched in fallback mode:', photos.length)
 }
 
 debug().catch((e) => {

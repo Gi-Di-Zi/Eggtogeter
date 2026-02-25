@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 320" width="1024" height="320">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@700&amp;display=swap');
+      .logo-text {
+        font-family: 'Quicksand', sans-serif;
+        font-size: 110px;
+        font-weight: 700;
+        fill: #6E4C3F;
+        letter-spacing: 0.05em;
+      }
+    </style>
+  </defs>
+  
+  <text x="512" y="160" text-anchor="middle" class="logo-text">EggTogether</text>
+  
+  <g transform="translate(0, 5)">
+    <path d="M 512 185 C 537 185, 555 210, 555 234 C 555 258, 537 275, 512 275 C 487 275, 469 258, 469 234 C 469 210, 487 185, 512 185 Z" 
+          fill="#F4DFC2" stroke="#6E4C3F" stroke-width="8" stroke-linejoin="round"/>
+    
+    <circle cx="490" cy="236" r="6.5" fill="#F39AA4" opacity="0.9"/>
+    <circle cx="534" cy="236" r="6.5" fill="#F39AA4" opacity="0.9"/>
+    
+    <circle cx="500" cy="227" r="5.5" fill="#6E4C3F"/>
+    <circle cx="524" cy="227" r="5.5" fill="#6E4C3F"/>
+    
+    <path d="M 506 238 Q 512 244 518 238" fill="none" stroke="#6E4C3F" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

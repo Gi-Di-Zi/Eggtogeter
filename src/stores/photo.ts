@@ -17,8 +17,10 @@ export interface Photo {
     category_color?: string
     category_name?: string
     category_ids?: number[]
-    visibility?: 'public' | 'friends' | 'private'
+    visibility?: PhotoVisibility
 }
+
+export type PhotoVisibility = 'friends' | 'specific' | 'private'
 
 export const usePhotoStore = defineStore('photo', () => {
     const photos = ref<Photo[]>([])
@@ -176,10 +178,11 @@ export const usePhotoStore = defineStore('photo', () => {
         }
     }
 
-    const updatePhotoVisibility = async (photoId: string, visibility: 'public' | 'friends' | 'private' | 'specific', targetUserIds: string[] = []) => {
+    const updatePhotoVisibility = async (photoId: string, visibility: PhotoVisibility, targetUserIds: string[] = []) => {
         // Optimistic update
         const photo = photos.value.find(p => p.id === photoId)
-        if (photo) photo.visibility = visibility as any // Type cast if needed until type is fully updated
+        const previousVisibility = photo?.visibility
+        if (photo) photo.visibility = visibility
 
         // 1. Update Visibility Column
         const { error } = await supabase
@@ -189,35 +192,34 @@ export const usePhotoStore = defineStore('photo', () => {
 
         if (error) {
             console.error('Error updating visibility:', error)
+            if (photo) photo.visibility = previousVisibility
             return
         }
 
-        // 2. Handle Specific Shares
-        if (visibility === 'specific') {
-            // clear existing
-            const { error: delError } = await supabase
+        // 2. Keep photo_shares consistent with current visibility.
+        // non-specific visibility should not retain stale share rows.
+        const { error: delError } = await supabase
+            .from('photo_shares')
+            .delete()
+            .eq('photo_id', photoId)
+
+        if (delError) {
+            console.error('Error clearing shares:', delError)
+        }
+
+        // 3. Insert specific shares
+        if (visibility === 'specific' && targetUserIds.length > 0) {
+            const shares = targetUserIds.map(uid => ({
+                photo_id: photoId,
+                user_id: uid
+            }))
+
+            const { error: insError } = await supabase
                 .from('photo_shares')
-                .delete()
-                .eq('photo_id', photoId)
+                .insert(shares)
 
-            if (delError) {
-                console.error('Error clearing shares:', delError)
-            }
-
-            // insert new
-            if (targetUserIds.length > 0) {
-                const shares = targetUserIds.map(uid => ({
-                    photo_id: photoId,
-                    user_id: uid
-                }))
-
-                const { error: insError } = await supabase
-                    .from('photo_shares')
-                    .insert(shares)
-
-                if (insError) {
-                    console.error('Error inserting shares:', insError)
-                }
+            if (insError) {
+                console.error('Error inserting shares:', insError)
             }
         }
     }

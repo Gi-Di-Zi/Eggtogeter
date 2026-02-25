@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { useGoogleMapsLoader } from '@/composables/useGoogleMapsLoader'
 import { useI18n } from 'vue-i18n'
 import PhotoLocationPicker from '@/components/PhotoLocationPicker.vue'
+import { isPlusCodeAddress, pickBestFormattedAddress, sanitizeAddress } from '@/utils/addressUtils'
 
 const props = defineProps<{
   modelValue: boolean
@@ -28,7 +29,10 @@ const showLocationHelper = ref(false)
 watch(() => props.photo, async (newPhoto) => {
     if (newPhoto) {
         localPhoto.value = { ...newPhoto }
-        if (!localPhoto.value.address && localPhoto.value.latitude && localPhoto.value.longitude) {
+        const currentAddress = localPhoto.value.address?.trim() || ''
+        const needsRecovery = !currentAddress || isPlusCodeAddress(currentAddress)
+
+        if (needsRecovery && localPhoto.value.latitude && localPhoto.value.longitude) {
             try {
                 await loadGoogleMaps()
                 const recoveredAddr = await getAddressFromCoords(localPhoto.value.latitude, localPhoto.value.longitude)
@@ -114,8 +118,9 @@ const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> 
         }
         const geocoder = new google.maps.Geocoder()
         geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
-            if (status === 'OK' && results && results[0]) {
-                resolve(results[0].formatted_address)
+            if (status === 'OK' && results && results.length > 0) {
+                const best = pickBestFormattedAddress(results)
+                resolve(best && !isPlusCodeAddress(best) ? best : null)
             } else {
                 resolve(null)
             }
@@ -126,8 +131,12 @@ const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> 
 const handleLocationConfirm = (location: { lat: number, lng: number, address: string }) => {
     localPhoto.value.latitude = location.lat
     localPhoto.value.longitude = location.lng
-    localPhoto.value.address = location.address
+    localPhoto.value.address = sanitizeAddress(location.address) || ''
     showLocationHelper.value = false
+}
+
+const getDisplayAddress = (address?: string | null) => {
+    return sanitizeAddress(address) || t('photo.edit.no_location')
 }
 </script>
 
@@ -189,7 +198,7 @@ const handleLocationConfirm = (location: { lat: number, lng: number, address: st
             <div class="form-item">
                 <label><el-icon><MapLocation /></el-icon> {{ $t('photo.edit.label_location') }}</label>
                 <div v-if="localPhoto.latitude && localPhoto.longitude" class="location-info">
-                    <p class="address">{{ localPhoto.address || $t('photo.edit.no_location') }}</p>
+                    <p class="address">{{ getDisplayAddress(localPhoto.address) }}</p>
                     <div class="location-btns">
                         <el-button size="small" type="primary" plain @click="showLocationHelper = true">{{ $t('photo.edit.edit_location') }}</el-button>
                     </div>

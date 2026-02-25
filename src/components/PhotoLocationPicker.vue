@@ -6,6 +6,7 @@ import { Search, Location } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import i18n from '@/plugins/i18n'
 import { ElMessage } from 'element-plus'
+import { isPlusCodeAddress, pickBestFormattedAddress, sanitizeAddress } from '@/utils/addressUtils'
 
 const { t } = useI18n()
 const { loadGoogleMaps } = useGoogleMapsLoader()
@@ -57,8 +58,9 @@ const getAddressFromCoords = (lat: number, lng: number): Promise<string | null> 
         }
         const geocoder = new google.maps.Geocoder()
         geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
-            if (status === 'OK' && results && results[0]) {
-                resolve(results[0].formatted_address)
+            if (status === 'OK' && results && results.length > 0) {
+                const best = pickBestFormattedAddress(results)
+                resolve(best && !isPlusCodeAddress(best) ? best : null)
             } else {
                 resolve(null)
             }
@@ -106,7 +108,8 @@ const initMap = async () => {
     }
 
     // Set initial temp location
-    const addr = props.initialAddress || await getAddressFromCoords(initialLat, initialLng)
+    const initialAddress = sanitizeAddress(props.initialAddress)
+    const addr = initialAddress || await getAddressFromCoords(initialLat, initialLng)
     tempLocation.value = { lat: initialLat, lng: initialLng, address: addr || t('upload.no_address_info') }
 }
 
@@ -116,7 +119,8 @@ const updateTempLocation = async (lat: number, lng: number, explicitAddress?: st
         mapMarker.value.setPosition(pos)
         mapInstance.value.panTo(pos)
         
-        const addr = explicitAddress || await getAddressFromCoords(lat, lng)
+        const sanitized = sanitizeAddress(explicitAddress)
+        const addr = sanitized || await getAddressFromCoords(lat, lng)
         tempLocation.value = { lat, lng, address: addr || t('upload.no_address_info') }
     }
 }
@@ -201,7 +205,7 @@ const handleSelect = async (item: any) => {
              
              const lat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat
              const lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng
-             const addr = place.formattedAddress || place.displayName
+             const addr = sanitizeAddress(place.formattedAddress, item.description || place.displayName) || undefined
 
              // Update map logic
              updateTempLocation(lat, lng, addr)

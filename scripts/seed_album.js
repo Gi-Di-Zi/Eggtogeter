@@ -77,11 +77,11 @@ async function seedAlbum() {
         return;
     }
 
-    // Some schemas do not allow 'public' in photos.visibility check constraint.
-    // Keep this as best-effort and do not fail album seed on constraint mismatch.
+    // Current schema allows: friends | specific | private
+    // Keep seeded photos readable in friend-scoped scenarios.
     const { error: visError } = await supabase
         .from('photos')
-        .update({ visibility: 'public' })
+        .update({ visibility: 'friends' })
         .in('id', photos.map((p) => p.id));
 
     if (visError) {
@@ -89,7 +89,7 @@ async function seedAlbum() {
         return;
     }
 
-    console.log('Album created and photo visibility updated.');
+    console.log('Album created and photo visibility updated to friends.');
 }
 
 seedAlbum();

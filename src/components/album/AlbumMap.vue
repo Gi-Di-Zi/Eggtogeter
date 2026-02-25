@@ -46,6 +46,38 @@ const models = {
 let vehicleMarker: maplibregl.Marker | null = null
 let previousPosCoordinates: number[] | null = null
 
+const hasValidRouteGeometry = (route: any): boolean => {
+    if (!route || !route.geometry || !Array.isArray(route.geometry.coordinates)) return false
+    return route.geometry.coordinates.length >= 2
+}
+
+const clearSegmentLayers = () => {
+    if (!map) return
+    for (let i = 0; i < 50; i++) {
+        if (map.getLayer(`segment-layer-${i}`)) map.removeLayer(`segment-layer-${i}`)
+        if (map.getSource(`segment-${i}`)) map.removeSource(`segment-${i}`)
+    }
+}
+
+const registerMissingSpriteFallback = () => {
+    if (!map) return
+
+    map.on('styleimagemissing', (event) => {
+        if (!map) return
+        if (!event.id || map.hasImage(event.id)) return
+
+        try {
+            map.addImage(event.id, {
+                width: 1,
+                height: 1,
+                data: new Uint8Array([0, 0, 0, 0])
+            })
+        } catch (e) {
+            console.warn('[AlbumMap] Failed to register fallback sprite image:', event.id, e)
+        }
+    })
+}
+
 
 const maptilerKey = import.meta.env.VITE_MAPTILER_KEY
 const mapStyles: Record<string, string> = {
@@ -176,22 +208,27 @@ const addRouteLayer = () => {
 
     // Add segment layers if segments are available
     if (props.segments && props.segments.length > 0) {
+        clearSegmentLayers()
+
         // [FIX] Remove global solid route line first
         if (map.getLayer('route-line')) map.removeLayer('route-line')
         if (map.getSource('route')) map.removeSource('route')
 
         props.segments.forEach((segment: any, index: number) => {
+            const geometry = segment?.geometry
+            if (!hasValidRouteGeometry(geometry)) return
+
             const sourceId = `segment-${index}`
             const layerId = `segment-layer-${index}`
             
             // Update exist source or create new
             const source = map!.getSource(sourceId) as maplibregl.GeoJSONSource
             if (source) {
-                source.setData(segment.geometry)
+                source.setData(geometry as any)
             } else {
                 map!.addSource(sourceId, {
                     type: 'geojson',
-                    data: segment.geometry
+                    data: geometry as any
                 })
             }
             
@@ -220,19 +257,25 @@ const addRouteLayer = () => {
             }
         })
     } else {
+        clearSegmentLayers()
+
         // Fallback: single route line
-        // ... (Keep existing verify logic or simplify)
         const source = map.getSource('route') as maplibregl.GeoJSONSource
-        if (source && props.routeLine) {
-            source.setData(props.routeLine)
-        } else if (props.routeLine) {
-             map.addSource('route', {
-                 type: 'geojson',
-                 data: props.routeLine
-             })
+        if (hasValidRouteGeometry(props.routeLine)) {
+            if (source) {
+                source.setData(props.routeLine as any)
+            } else {
+                map.addSource('route', {
+                    type: 'geojson',
+                    data: props.routeLine as any
+                })
+            }
+        } else {
+            if (map.getLayer('route-line')) map.removeLayer('route-line')
+            if (map.getSource('route')) map.removeSource('route')
         }
 
-        if (!map.getLayer('route-line')) {
+        if (!map.getLayer('route-line') && map.getSource('route')) {
             map.addLayer({
                 id: 'route-line',
                 type: 'line',
@@ -256,11 +299,9 @@ const addRouteLayer = () => {
 }
 
 // Watch for segment changes to ensure route layer is added (especially for 'none' mode dashed lines)
-watch(() => props.segments, (newSegments) => {
+watch(() => props.segments, (_newSegments) => {
     // console.log('[AlbumMap] Segments changed:', newSegments?.length) 
-    if (map && newSegments && newSegments.length > 0) {
-        // [FIX] Do NOT clear layers here. addRouteLayer now handles updates smartly via setData.
-        // clearRouteLayers() 
+    if (map) {
         addRouteLayer()
     }
 }, { deep: true })
@@ -522,9 +563,10 @@ onUnmounted(() => {
 const clearRouteLayers = () => {
     if (!map) return
     
-    // Remove fallback
-    if (map.getLayer('route-layer')) map.removeLayer('route-layer')
-    if (map.getSource('route-source')) map.removeSource('route-source')
+    if (map.getLayer('route-line')) map.removeLayer('route-line')
+    if (map.getSource('route')) map.removeSource('route')
+    if (map.getLayer('history-route-line')) map.removeLayer('history-route-line')
+    if (map.getSource('history-route')) map.removeSource('history-route')
     
     // Remove segments (Iterate safely up to a reasonable limit or track IDs)
     // Since we don't track IDs, we iterate broadly or assume index based.
@@ -552,6 +594,8 @@ const initMap = () => {
         interactive: false,
         attributionControl: false
     })
+
+    registerMissingSpriteFallback()
 
     map.on('load', () => {
         // Initial Layer Setup
@@ -584,12 +628,7 @@ const setupAllLayers = () => {
     add3DBuildings()
     
     // 2. Route & History
-    // Check source first
-    if (!map.getSource('route')) addRouteLayer()
-    else {
-         // If source exists but layers missing (rare with setStyle, usually all gone)
-         if (!map.getLayer('route-line')) addRouteLayer()
-    }
+    addRouteLayer()
 
     // 3. 3D Model Layer (Disabled for reliability, using HQ 2D instead)
     // if (!map.getLayer('3d-models')) add3DLayer()
@@ -619,7 +658,11 @@ watch(() => props.theme, (val) => {
 })
 
 watch(() => props.routeLine, (newVal) => {
-    if (map && newVal) {
+    if (map) {
+        addRouteLayer()
+    }
+
+    if (map && hasValidRouteGeometry(newVal)) {
         try {
             const source = map.getSource('route') as maplibregl.GeoJSONSource
             if (source) {

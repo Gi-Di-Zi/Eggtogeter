@@ -1,0 +1,7 @@
+name = "scribe"
+role = "documentation"
+description = "SSOT/정책/런북 문서 초안 작성 역할."
+write_access = false
+
+[focus]
+primary = ["backlog-issue-update", "runbook-draft", "log-template"]

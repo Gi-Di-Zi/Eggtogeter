@@ -1,0 +1,7 @@
+name = "explorer"
+role = "analysis"
+description = "읽기/탐색/영향 범위 분석 전용 역할."
+write_access = false
+
+[focus]
+primary = ["context-discovery", "dependency-impact", "risk-scan"]

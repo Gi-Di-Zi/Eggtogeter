@@ -1,7 +1,7 @@
 ﻿import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onScopeDispose } from 'vue'
 import { supabase } from '@/lib/supabase'
-import type { User, Session } from '@supabase/supabase-js'
+import type { User, Session, Subscription } from '@supabase/supabase-js'
 
 export interface UserProfile {
     id: string
@@ -16,6 +16,9 @@ export const useAuthStore = defineStore('auth', () => {
     const session = ref<Session | null>(null)
     const userProfile = ref<UserProfile | null>(null)
     const loading = ref(true)
+
+    let authStateSubscription: Subscription | null = null
+    let initPromise: Promise<void> | null = null
 
     const isAuthenticated = computed(() => !!user.value)
 
@@ -34,40 +37,48 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    async function initialize() {
-        loading.value = true
-        try {
-            const { data: { session: currentSession } } = await supabase.auth.getSession()
-            session.value = currentSession
-            user.value = currentSession?.user ?? null
+    async function applySession(nextSession: Session | null) {
+        session.value = nextSession
+        user.value = nextSession?.user ?? null
 
-            if (user.value) {
-                await fetchProfile(user.value.id)
-            }
-
-            supabase.auth.onAuthStateChange(async (_event, newSession) => {
-                session.value = newSession
-                user.value = newSession?.user ?? null
-                if (user.value) {
-                    await fetchProfile(user.value.id)
-                } else {
-                    userProfile.value = null
-                }
-            })
-        } catch (error) {
-            console.error('Auth initialization error:', error)
-        } finally {
-            loading.value = false
+        if (user.value) {
+            await fetchProfile(user.value.id)
+        } else {
+            userProfile.value = null
         }
+    }
+
+    async function initialize() {
+        if (initPromise) return initPromise
+
+        initPromise = (async () => {
+            loading.value = true
+            try {
+                const { data: { session: currentSession } } = await supabase.auth.getSession()
+                await applySession(currentSession)
+
+                if (!authStateSubscription) {
+                    const { data } = supabase.auth.onAuthStateChange((_event, newSession) => {
+                        void applySession(newSession)
+                    })
+                    authStateSubscription = data.subscription
+                }
+            } catch (error) {
+                console.error('Auth initialization error:', error)
+            } finally {
+                loading.value = false
+                initPromise = null
+            }
+        })()
+
+        return initPromise
     }
 
     async function signOut() {
         loading.value = true
         try {
             await supabase.auth.signOut()
-            user.value = null
-            session.value = null
-            userProfile.value = null
+            await applySession(null)
         } catch (error) {
             console.error('Logout error:', error)
         } finally {
@@ -97,6 +108,11 @@ export const useAuthStore = defineStore('auth', () => {
             loading.value = false
         }
     }
+
+    onScopeDispose(() => {
+        authStateSubscription?.unsubscribe()
+        authStateSubscription = null
+    })
 
     return {
         user,

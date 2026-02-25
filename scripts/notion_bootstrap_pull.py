@@ -34,6 +34,41 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 GLOBAL_CODEX_ROOT = Path.home() / ".codex"
 
 
+def load_env_value(env_path: Path, key: str) -> str:
+    try:
+        text = env_path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        lhs, rhs = line.split("=", 1)
+        if lhs.strip() != key:
+            continue
+        value = rhs.strip()
+        if len(value) >= 2 and (
+            (value[0] == '"' and value[-1] == '"')
+            or (value[0] == "'" and value[-1] == "'")
+        ):
+            value = value[1:-1]
+        return value.strip()
+    return ""
+
+
+def load_token_from_dotenv_if_missing() -> None:
+    if os.getenv(TOKEN_ENV, "").strip():
+        return
+    for candidate in (WORKSPACE_ROOT / ".env", WORKSPACE_ROOT / ".env.local"):
+        if not candidate.is_file():
+            continue
+        token = load_env_value(candidate, TOKEN_ENV)
+        if token:
+            os.environ[TOKEN_ENV] = token
+            return
+
+
 def request(method: str, path: str, token: str, payload: Optional[Dict] = None) -> Tuple[int, str]:
     data = None
     if payload is not None:
@@ -372,6 +407,7 @@ def main() -> int:
     parser.add_argument("--output-dir", help="번들 출력 폴더(기본: .bootstrap/notion/<ts>)")
     args = parser.parse_args()
 
+    load_token_from_dotenv_if_missing()
     token = os.getenv(TOKEN_ENV, "").strip()
     if not token:
         print(f"환경변수 {TOKEN_ENV} 이(가) 비어 있습니다.", file=sys.stderr)

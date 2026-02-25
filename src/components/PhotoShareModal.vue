@@ -1,7 +1,6 @@
-```html
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { usePhotoStore } from '@/stores/photo'
+import { usePhotoStore, type PhotoVisibility } from '@/stores/photo'
 import { useFriendStore } from '@/stores/friend'
 import { supabase } from '@/lib/supabase'
 import { ElMessage } from 'element-plus'
@@ -27,6 +26,10 @@ const selectedFriendIds = ref<string[]>([])
 const targetFriendId = ref('') // For the single select input
 const loadingShares = ref(false)
 
+const isPhotoVisibility = (value: unknown): value is PhotoVisibility => {
+    return value === 'friends' || value === 'specific' || value === 'private'
+}
+
 // Sync with v-model ans init scope
 watch(() => props.modelValue, async (val) => {
     dialogVisible.value = val
@@ -37,13 +40,7 @@ watch(() => props.modelValue, async (val) => {
         }
 
         const photo = photoStore.photos.find(p => p.id === props.photoId)
-        if (photo && photo.visibility && photo.visibility !== 'public') {
-             // Type cast safely
-             shareScope.value = photo.visibility as any
-        } else {
-            // Default to private if unknown or public(legacy)
-            shareScope.value = 'private' 
-        }
+        shareScope.value = isPhotoVisibility(photo?.visibility) ? photo.visibility : 'private'
 
         // Load existing shares if specific
         if (shareScope.value === 'specific') {

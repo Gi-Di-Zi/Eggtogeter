@@ -1,0 +1,7 @@
+name = "reviewer"
+role = "quality"
+description = "규칙/스타일/회귀 리스크 점검 역할."
+write_access = false
+
+[focus]
+primary = ["regression-risk", "rule-compliance", "test-gap"]

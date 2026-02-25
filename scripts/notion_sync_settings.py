@@ -40,6 +40,41 @@ GLOBAL_CODEX_ROOT = Path.home() / ".codex"
 HOME_ROOT = Path.home()
 
 
+def load_env_value(env_path: Path, key: str) -> str:
+    try:
+        text = env_path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        lhs, rhs = line.split("=", 1)
+        if lhs.strip() != key:
+            continue
+        value = rhs.strip()
+        if len(value) >= 2 and (
+            (value[0] == '"' and value[-1] == '"')
+            or (value[0] == "'" and value[-1] == "'")
+        ):
+            value = value[1:-1]
+        return value.strip()
+    return ""
+
+
+def load_token_from_dotenv_if_missing() -> None:
+    if os.getenv(TOKEN_ENV, "").strip():
+        return
+    for candidate in (WORKSPACE_ROOT / ".env", WORKSPACE_ROOT / ".env.local"):
+        if not candidate.is_file():
+            continue
+        token = load_env_value(candidate, TOKEN_ENV)
+        if token:
+            os.environ[TOKEN_ENV] = token
+            return
+
+
 def eprint(msg: str) -> None:
     print(msg, file=sys.stderr)
 
@@ -478,9 +513,9 @@ def display_path(path: Path) -> str:
     home = str(HOME_ROOT).replace("\\", "/")
     home_prefix = home.rstrip("/") + "/"
     if raw.lower() == home.lower():
-        return "$HOME"
+        return "~"
     if raw.lower().startswith(home_prefix.lower()):
-        return "$HOME/" + raw[len(home_prefix) :]
+        return "~/" + raw[len(home_prefix) :]
     return raw
 
 
@@ -558,6 +593,13 @@ def build_sync_blocks() -> List[Dict]:
         ("Workspace AGENTS", WORKSPACE_ROOT / "AGENTS.md", True),
         ("Project Context", WORKSPACE_ROOT / ".agent" / "Project_Context.md", True),
         ("Rules & Skills Summary", WORKSPACE_ROOT / "docs" / "Resources" / "Rules_Skills_Summary.md", True),
+        ("Backlog", WORKSPACE_ROOT / "docs" / "Resources" / "Backlog.md", True),
+        ("Issue Tracker", WORKSPACE_ROOT / "docs" / "Resources" / "Issue_Tracker.md", True),
+        ("Delegation Policy", WORKSPACE_ROOT / "docs" / "Resources" / "Delegation_Policy.md", True),
+        ("Asset Delegation Policy", WORKSPACE_ROOT / "docs" / "Resources" / "Asset_Delegation_Policy.md", True),
+        ("Stack and Style Guide", WORKSPACE_ROOT / "docs" / "Resources" / "Stack_and_Style_Guide.md", True),
+        ("WSL Migration Guide", WORKSPACE_ROOT / "docs" / "Resources" / "WSL_Migration_Guide.md", True),
+        ("Manual Patches", WORKSPACE_ROOT / "docs" / "Resources" / "Manual_Patches.md", True),
         ("Docs Index", WORKSPACE_ROOT / "docs" / "README.md", True),
         ("Package Scripts", WORKSPACE_ROOT / "package.json", True),
     ]
@@ -571,6 +613,8 @@ def build_sync_blocks() -> List[Dict]:
         ("Notion Watch Script", WORKSPACE_ROOT / "scripts" / "notion_sync_watch.py", True),
         ("Notion Bootstrap Pull Script", WORKSPACE_ROOT / "scripts" / "notion_bootstrap_pull.py", True),
         ("Notion Bootstrap Apply Script", WORKSPACE_ROOT / "scripts" / "notion_bootstrap_apply.py", True),
+        ("WSL Doctor Script", WORKSPACE_ROOT / "scripts" / "wsl_doctor.sh", True),
+        ("Supabase WSL Wrapper Script", WORKSPACE_ROOT / "scripts" / "supabase_cli_wsl.sh", True),
         ("Notion Runbook", WORKSPACE_ROOT / "docs" / "Resources" / "Notion_Sync_Runbook.md", True),
         ("Notion Human Guide", WORKSPACE_ROOT / "docs" / "Resources" / "Notion_Human_Guide.md", True),
     ]
@@ -604,6 +648,7 @@ def build_sync_blocks() -> List[Dict]:
 
 
 def main() -> int:
+    load_token_from_dotenv_if_missing()
     token = os.getenv(TOKEN_ENV, "").strip()
     if not token:
         eprint(f"환경변수 {TOKEN_ENV} 이(가) 비어 있습니다.")

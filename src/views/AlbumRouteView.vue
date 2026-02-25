@@ -121,6 +121,8 @@ import AlbumTimeline from '@/components/album/AlbumTimeline.vue'
 import { Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
+type AlbumFrameStyle = 'classic' | 'vintage' | 'neon' | 'gradient' | 'retro' | 'modern'
+
 const route = useRoute()
 const albumStore = useAlbumStore()
 const albumId = ref<string | null>(null) // Reactive albumId
@@ -229,10 +231,12 @@ const currentPhoto = computed(() => {
 // Current Frame Style
 const currentFrameStyle = computed(() => {
     const photo = currentPhoto.value
-    if (!photo || !albumStore.currentAlbum?.content_data?.settings?.photoFrameStyles) {
+    const frameStyles = albumStore.currentAlbum?.content_data?.settings?.photoFrameStyles as Record<string, AlbumFrameStyle> | undefined
+
+    if (!photo || !frameStyles) {
         return 'classic' // Default fallback
     }
-    const frameStyles = albumStore.currentAlbum.content_data.settings.photoFrameStyles
+
     return frameStyles[photo.id] || 'classic'
 })
 

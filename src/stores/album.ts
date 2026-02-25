@@ -1,7 +1,30 @@
-import { defineStore } from 'pinia'
+﻿import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from './auth'
+
+type TransitionMode = 'walk' | 'car' | 'bus' | 'subway' | 'train' | 'airplane' | 'ship' | 'none'
+
+type AlbumTransition = {
+    from: string
+    to: string
+    mode: TransitionMode
+}
+
+type AlbumSettings = {
+    bgm?: string
+    template?: string
+    mapTheme?: string
+    playbackSpeed?: number
+    photoFrameStyles?: Record<string, string>
+    [key: string]: unknown
+}
+
+type AlbumContent = {
+    photo_ids: string[]
+    transitions?: AlbumTransition[]
+    settings?: AlbumSettings
+}
 
 export interface Album {
     id: string
@@ -10,22 +33,27 @@ export interface Album {
     description: string | null
     style_type: 'route_anim' | 'scroll_view' | 'ai_video'
     is_public: boolean
-    content_data: {
-        photo_ids: string[]
-        transitions?: {
-            from: string
-            to: string
-            mode: 'walk' | 'car' | 'bus' | 'subway' | 'train' | 'airplane' | 'ship' | 'none'
-        }[]
-        settings?: {
-            bgm?: string
-            template?: string
-            [key: string]: any
-        }
-    }
+    content_data: AlbumContent
     video_url: string | null
     created_at: string
     updated_at: string
+}
+
+const isMissingRpcError = (error: unknown): boolean => {
+    if (!error || typeof error !== 'object') return false
+
+    const maybeError = error as { code?: unknown; message?: unknown }
+    const code = typeof maybeError.code === 'string' ? maybeError.code : ''
+    const message = typeof maybeError.message === 'string' ? maybeError.message.toLowerCase() : ''
+
+    return code === 'PGRST202' || message.includes('get_public_album_photos')
+}
+
+const sortPhotosByAlbumOrder = <T extends { id: string }>(photoIds: string[], rows: T[]): T[] => {
+    const rowById = new Map(rows.map((row) => [row.id, row]))
+    return photoIds
+        .map((id) => rowById.get(id))
+        .filter((row): row is T => !!row)
 }
 
 export const useAlbumStore = defineStore('album', () => {
@@ -35,7 +63,6 @@ export const useAlbumStore = defineStore('album', () => {
     const currentAlbum = ref<Album | null>(null)
     const loading = ref(false)
 
-    // 내 앨범 목록 가져오기
     async function fetchAlbums() {
         if (!authStore.user?.id) return
 
@@ -58,7 +85,6 @@ export const useAlbumStore = defineStore('album', () => {
         }
     }
 
-    // 특정 앨범 가져오기 (ID 기준) - 공개 앨범 지원
     async function fetchAlbumById(albumId: string, publicMode = false) {
         loading.value = true
         try {
@@ -67,7 +93,6 @@ export const useAlbumStore = defineStore('album', () => {
                 .select('*')
                 .eq('id', albumId)
 
-            // Public mode: only fetch if is_public is true
             if (publicMode) {
                 query = query.eq('is_public', true)
             }
@@ -77,7 +102,7 @@ export const useAlbumStore = defineStore('album', () => {
             if (error) throw error
 
             currentAlbum.value = data
-            return data
+            return data as Album
         } catch (err) {
             console.error('Error fetching album:', err)
             currentAlbum.value = null
@@ -87,7 +112,6 @@ export const useAlbumStore = defineStore('album', () => {
         }
     }
 
-    // 앨범 생성
     async function createAlbum(
         title: string,
         styleType: Album['style_type'],
@@ -107,7 +131,7 @@ export const useAlbumStore = defineStore('album', () => {
                     title,
                     description: description || null,
                     style_type: styleType,
-                    is_public: true, // Default to public for easy sharing
+                    is_public: true,
                     content_data: {
                         photo_ids: photoIds,
                         settings: settings || {},
@@ -120,7 +144,7 @@ export const useAlbumStore = defineStore('album', () => {
             if (error) throw error
 
             albums.value.unshift(data)
-            return data
+            return data as Album
         } catch (err) {
             console.error('Error creating album:', err)
             throw err
@@ -129,10 +153,9 @@ export const useAlbumStore = defineStore('album', () => {
         }
     }
 
-    // 앨범 수정
     async function updateAlbum(
         albumId: string,
-        updates: Partial<Pick<Album, 'title' | 'description' | 'is_public' | 'content_data'>>
+        updates: Partial<Pick<Album, 'title' | 'description' | 'is_public' | 'content_data' | 'video_url'>>
     ) {
         if (!authStore.user?.id) return null
 
@@ -148,8 +171,7 @@ export const useAlbumStore = defineStore('album', () => {
 
             if (error) throw error
 
-            // Update local state
-            const index = albums.value.findIndex(a => a.id === albumId)
+            const index = albums.value.findIndex((album) => album.id === albumId)
             if (index !== -1) {
                 albums.value[index] = data
             }
@@ -157,7 +179,7 @@ export const useAlbumStore = defineStore('album', () => {
                 currentAlbum.value = data
             }
 
-            return data
+            return data as Album
         } catch (err) {
             console.error('Error updating album:', err)
             throw err
@@ -166,7 +188,6 @@ export const useAlbumStore = defineStore('album', () => {
         }
     }
 
-    // 앨범 삭제
     async function deleteAlbum(albumId: string) {
         if (!authStore.user?.id) return
 
@@ -180,8 +201,7 @@ export const useAlbumStore = defineStore('album', () => {
 
             if (error) throw error
 
-            // Remove from local state
-            albums.value = albums.value.filter(a => a.id !== albumId)
+            albums.value = albums.value.filter((album) => album.id !== albumId)
             if (currentAlbum.value?.id === albumId) {
                 currentAlbum.value = null
             }
@@ -193,33 +213,25 @@ export const useAlbumStore = defineStore('album', () => {
         }
     }
 
-    // 앨범 내 사진 상세 정보 가져오기
     async function fetchAlbumPhotos(albumId: string, publicMode = false) {
-        console.log('[fetchAlbumPhotos] albumId:', albumId, 'publicMode:', publicMode)
         const album = await fetchAlbumById(albumId, publicMode)
-        console.log('[fetchAlbumPhotos] album:', album)
 
-        if (!album || !album.content_data.photo_ids || album.content_data.photo_ids.length === 0) {
-            console.log('[fetchAlbumPhotos] No photo_ids in album')
+        if (!album || !Array.isArray(album.content_data?.photo_ids) || album.content_data.photo_ids.length === 0) {
             return []
         }
+
         loading.value = true
         try {
-            // [New] Public Mode: use Secure RPC to bypass RLS
             if (publicMode) {
                 const { data, error } = await supabase.rpc('get_public_album_photos', { p_album_id: albumId })
 
-                if (error) {
-                    console.error('Failed to fetch public photos via RPC', error)
-                    return []
+                if (!error && Array.isArray(data)) {
+                    return sortPhotosByAlbumOrder(album.content_data.photo_ids, data as { id: string }[])
                 }
-                return data || []
-            }
 
-            // Standard Mode (Private/Authenticated)
-            const album = await fetchAlbumById(albumId, false) // fetchAlbumById handles its own loading state
-            if (!album || !album.content_data.photo_ids || album.content_data.photo_ids.length === 0) {
-                return []
+                if (error && !isMissingRpcError(error)) {
+                    console.error('Failed to fetch public photos via RPC', error)
+                }
             }
 
             const { data, error } = await supabase
@@ -229,23 +241,17 @@ export const useAlbumStore = defineStore('album', () => {
 
             if (error) throw error
 
-            // Sort by album order
-            const sorted = album.content_data.photo_ids
-                .map((id: string) => data.find((p: any) => p.id === id))
-                .filter((p: any) => !!p)
-
-            return sorted
-        } catch (e) {
-            console.error('Failed to fetch album photos', e)
+            return sortPhotosByAlbumOrder(album.content_data.photo_ids, (data || []) as { id: string }[])
+        } catch (error) {
+            console.error('Failed to fetch album photos', error)
             return []
         } finally {
             loading.value = false
         }
     }
 
-    // AI Video URL 업데이트
     async function updateVideoUrl(albumId: string, videoUrl: string) {
-        return updateAlbum(albumId, { video_url: videoUrl } as any)
+        return updateAlbum(albumId, { video_url: videoUrl })
     }
 
     return {

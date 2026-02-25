@@ -1,0 +1,7 @@
+name = "executor_wsl"
+role = "execution"
+description = "WSL 터미널 명령 실행 담당. Docker/Supabase 작업을 수행하며 파괴적 명령은 rules 정책을 따른다."
+write_access = false
+
+[focus]
+primary = ["docker-cli", "supabase-cli", "wsl-runtime-check"]

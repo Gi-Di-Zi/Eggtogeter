@@ -37,3 +37,13 @@ start_log.txt
 status.json
 *.git_acl_backup.txt
 git_debug.txt
+
+# Workspace runtime/cache artifacts
+.vite-codex/
+.npm-cache/
+.npm-cache-pw-*/
+output/
+push-work/
+scripts/_e2e_svc_key.txt
+.tools/supabase-cli/
+*:Zone.Identifier

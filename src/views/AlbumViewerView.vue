@@ -7,6 +7,7 @@ import { ArrowLeft, VideoPlay, VideoPause, Refresh, Location, Loading as ElIconL
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useGoogleMapsLoader } from '@/composables/useGoogleMapsLoader'
+import { isPlusCodeAddress, pickBestFormattedAddress, sanitizeAddress } from '@/utils/addressUtils'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,11 +49,17 @@ onMounted(async () => {
     const geocoder = new google.maps.Geocoder()
     const recoveryPromises = rawPhotos.map(async (photo: any) => {
       // 주소가 비어있거나 '주소 정보 없음'인 경우 복구 시도
-      if (!photo.address?.trim() && photo.latitude && photo.longitude) {
+      const currentAddress = photo.address?.trim() || ''
+      const needsRecovery = !currentAddress || isPlusCodeAddress(currentAddress)
+
+      if (needsRecovery && photo.latitude && photo.longitude) {
         return new Promise<void>((resolve) => {
           geocoder.geocode({ location: { lat: photo.latitude, lng: photo.longitude } }, (results: any, status: any) => {
-            if (status === 'OK' && results && results[0]) {
-              photo.address = results[0].formatted_address
+            if (status === 'OK' && results && results.length > 0) {
+              const recovered = pickBestFormattedAddress(results)
+              if (recovered && !isPlusCodeAddress(recovered)) {
+                photo.address = recovered
+              }
             }
             resolve()
           })
@@ -194,6 +201,10 @@ const startAnimation = async () => {
     isPlaying.value = false
   }
 }
+
+const getReadableAddress = (address?: string | null) => {
+  return sanitizeAddress(address) || '위치 정보 없음'
+}
 </script>
 
 <template>
@@ -255,7 +266,7 @@ const startAnimation = async () => {
               <h4 class="popup-title">{{ photos[currentPhotoIndex].title || '제목 없음' }}</h4>
               <div class="popup-meta">
                 <el-icon><Location /></el-icon>
-                <span>{{ photos[currentPhotoIndex].address?.trim() || '위치 정보 없음' }}</span>
+                <span>{{ getReadableAddress(photos[currentPhotoIndex].address) }}</span>
               </div>
               <p v-if="photos[currentPhotoIndex].description" class="popup-desc">
                 {{ photos[currentPhotoIndex].description }}

@@ -1,0 +1,7 @@
+name = "default"
+role = "orchestrator"
+description = "메인 오케스트레이터. 최종 파일 변경을 단독으로 적용하는 단일 writer 역할."
+write_access = true
+
+[handoff]
+can_delegate_to = ["explorer", "reviewer", "scribe", "executor_wsl"]
